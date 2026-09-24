@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Stop Doom Scroll</string>
+    <string name="app_description">Set your limit. When your time is up, we stop you.</string>
+    <string name="dev_status_title">Development Build</string>
+    <string name="dev_status_body">Core protection is being built.</string>
+</resources>

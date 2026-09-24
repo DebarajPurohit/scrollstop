@@ -34,3 +34,9 @@ user-configured.\
 **Decision:** Never attempt to change or control another app's
 password/security credentials.\
 **Reason:** Security and product boundaries.
+
+### TD-006 --- Android Build Stack & Minimum Target APIs
+
+**Status:** Approved\
+**Decision:** Standardize on Application ID `com.scrollstop`, MinSDK 26 (Android 8.0), TargetSDK/CompileSDK 34 (Android 14), Kotlin 1.9.23, Gradle 8.7, and Jetpack Compose with Material 3.\
+**Reason:** Ensures compliance with Google Play Store target API policies while supporting over 95% of active Android devices and providing full compatibility with `UsageStatsManager` and `AccessibilityService` APIs.
