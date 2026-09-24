@@ -1,0 +1,36 @@
+# Technical Decisions
+
+### TD-001 --- UsageStatsManager as Source of Truth
+
+**Status:** Approved\
+**Decision:** UsageStatsManager is the authoritative usage source.\
+**Reason:** It is the Android platform mechanism for application usage
+statistics.
+
+### TD-002 --- AccessibilityService for Enforcement
+
+**Status:** Approved for feasibility validation\
+**Decision:** Use a narrowly scoped AccessibilityService to detect
+access to selected restricted apps and enforce predefined rules.\
+**Reason:** It provides the required enforcement trigger.
+
+### TD-003 --- Local-first
+
+**Status:** Approved\
+**Decision:** Store MVP data locally.\
+**Reason:** Avoid unnecessary accounts/cloud infrastructure and reduce
+data collection.
+
+### TD-004 --- Deterministic Rules
+
+**Status:** Approved\
+**Decision:** Core blocking decisions are deterministic and
+user-configured.\
+**Reason:** Reliability, testability, transparency and compliance.
+
+### TD-005 --- No Password Modification
+
+**Status:** Approved\
+**Decision:** Never attempt to change or control another app's
+password/security credentials.\
+**Reason:** Security and product boundaries.
