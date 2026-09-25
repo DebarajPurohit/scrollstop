@@ -21,6 +21,7 @@
   - Strict privacy/security compliance: 0 sensitive permissions, 0 network access, 0 tracking
 - **POC-02A App Discovery Established**:
   - `PackageManagerAppDiscoveryRepository` discovering user-launchable apps (`ACTION_MAIN` + `CATEGORY_LAUNCHER`)
+  - Fixed Intent resolution query flag (`0` instead of `MATCH_DEFAULT_ONLY`) to correctly discover apps like Instagram (`com.instagram.android`) and Facebook (`com.facebook.katana`) whose launcher activities do not include `CATEGORY_DEFAULT`
   - Package visibility declared via `<queries>` in `AndroidManifest.xml` (0 permissions requested, 0 `QUERY_ALL_PACKAGES`)
   - Deduplication of package launcher activities, self-exclusion (`com.scrollstop`), deterministic case-insensitive alphabetical sorting
   - `AppSelectionViewModel` and reactive `AppSelectionUiState` (Loading, Success, Error, Empty)

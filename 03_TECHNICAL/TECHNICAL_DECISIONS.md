@@ -41,9 +41,10 @@ password/security credentials.\
 **Decision:** Standardize on Application ID `com.scrollstop`, MinSDK 26 (Android 8.0), TargetSDK/CompileSDK 36 (Android 16), Kotlin 1.9.23, Gradle 8.7, and Jetpack Compose with Material 3.\
 **Reason:** Ensures compliance with Google Play Store target API policies requiring target API 36 (Android 16) or higher as of August 31, 2026, while supporting over 95% of active Android devices and providing full compatibility with `UsageStatsManager` and `AccessibilityService` APIs.
 
-### TD-007 --- Launcher Intent Package Visibility for App Discovery
+### TD-007 --- Launcher Intent Package Visibility & Intent Resolution Flags for App Discovery
 
 **Status:** Approved\
-**Decision:** Implement app discovery using `Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)` with `PackageManager.queryIntentActivities()`, backed by explicit `<queries>` launcher declaration in `AndroidManifest.xml` without requesting `QUERY_ALL_PACKAGES` permission.\
-**Reason:** Complies with Android 11+ (API 30+) package visibility requirements and Google Play Store policy, avoiding high-risk sensitive permission disclosures while cleanly discovering user-launchable apps.
+**Decision:** Implement app discovery using `Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)` with `PackageManager.queryIntentActivities(intent, 0)` (flag `0`), backed by explicit `<queries>` launcher declaration in `AndroidManifest.xml` without requesting `QUERY_ALL_PACKAGES` permission.\
+**Reason:** Complies with Android 11+ (API 30+) package visibility requirements and Google Play Store policy. Using flag `0` instead of `MATCH_DEFAULT_ONLY` (`0x10000`) is essential because launcher activities in major third-party applications (e.g. Instagram `com.instagram.android`, Facebook `com.facebook.katana`) declare `ACTION_MAIN` + `CATEGORY_LAUNCHER` without `CATEGORY_DEFAULT` in their main launcher intent-filter. Flag `0` matches all user-launchable activities identically to Android Home Launchers while preserving strict Play Store policy compliance.
+
 

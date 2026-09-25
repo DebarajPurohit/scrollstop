@@ -29,7 +29,7 @@ class PackageManagerAppDiscoveryRepository(
 
             val resolveInfos = packageManager.queryIntentActivities(
                 launcherIntent,
-                PackageManager.MATCH_DEFAULT_ONLY.takeIf { it != 0 } ?: 0
+                0
             )
 
             processResolveInfos(packageManager, resolveInfos, ownPackageName)

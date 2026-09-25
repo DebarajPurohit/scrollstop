@@ -86,6 +86,24 @@ class PackageManagerAppDiscoveryRepositoryTest {
     }
 
     @Test
+    fun processResolveInfos_mapsInstagramAndFacebookLauncherActivities() {
+        val instagramInfo = createResolveInfo("com.instagram.android", "Instagram")
+        val facebookInfo = createResolveInfo("com.facebook.katana", "Facebook")
+
+        val result = PackageManagerAppDiscoveryRepository.processResolveInfos(
+            packageManager = packageManager,
+            resolveInfos = listOf(instagramInfo, facebookInfo),
+            ownPackageName = ownPackageName
+        )
+
+        assertEquals(2, result.size)
+        assertEquals("Facebook", result[0].appLabel)
+        assertEquals("com.facebook.katana", result[0].packageName)
+        assertEquals("Instagram", result[1].appLabel)
+        assertEquals("com.instagram.android", result[1].packageName)
+    }
+
+    @Test
     fun processResolveInfos_handlesEmptyOrNullResolveInfosSafely() {
         val resultNull = PackageManagerAppDiscoveryRepository.processResolveInfos(
             packageManager = packageManager,
