@@ -13,7 +13,7 @@
               affect                                   testing            
               enforcement                                                 
 
-  R-003       Package         High        Medium       Validate narrow    Open
+  R-003       Package         High        Medium       Validate narrow    Mitigated (POC-02A)
               visibility                               visibility         
               constraints                              approach in POC    
               complicate app                                              

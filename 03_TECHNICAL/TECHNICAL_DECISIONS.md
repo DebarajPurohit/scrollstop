@@ -40,3 +40,10 @@ password/security credentials.\
 **Status:** Approved\
 **Decision:** Standardize on Application ID `com.scrollstop`, MinSDK 26 (Android 8.0), TargetSDK/CompileSDK 36 (Android 16), Kotlin 1.9.23, Gradle 8.7, and Jetpack Compose with Material 3.\
 **Reason:** Ensures compliance with Google Play Store target API policies requiring target API 36 (Android 16) or higher as of August 31, 2026, while supporting over 95% of active Android devices and providing full compatibility with `UsageStatsManager` and `AccessibilityService` APIs.
+
+### TD-007 --- Launcher Intent Package Visibility for App Discovery
+
+**Status:** Approved\
+**Decision:** Implement app discovery using `Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)` with `PackageManager.queryIntentActivities()`, backed by explicit `<queries>` launcher declaration in `AndroidManifest.xml` without requesting `QUERY_ALL_PACKAGES` permission.\
+**Reason:** Complies with Android 11+ (API 30+) package visibility requirements and Google Play Store policy, avoiding high-risk sensitive permission disclosures while cleanly discovering user-launchable apps.
+

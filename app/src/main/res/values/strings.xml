@@ -3,4 +3,15 @@
     <string name="app_description">Set your limit. When your time is up, we stop you.</string>
     <string name="dev_status_title">Development Build</string>
     <string name="dev_status_body">Core protection is being built.</string>
+    
+    <!-- App Selection Strings -->
+    <string name="app_selection_title">Choose apps to control</string>
+    <string name="app_selection_subtitle">Select the apps you want Stop Doom Scroll to limit.</string>
+    <string name="app_selection_loading">Discovering installed apps…</string>
+    <string name="app_selection_empty">No launchable applications found.</string>
+    <string name="app_selection_error">Failed to discover applications.</string>
+    <string name="app_selection_retry">Retry Discovery</string>
+    <string name="btn_choose_apps">Choose Apps to Control</string>
+    <string name="btn_back">Back</string>
+    <string name="selected_apps_count">%1$d selected</string>
 </resources>

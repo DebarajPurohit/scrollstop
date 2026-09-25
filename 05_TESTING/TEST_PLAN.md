@@ -2,6 +2,9 @@
 
 ## Unit
 
+-   App discovery mapping and deduplication
+-   Deterministic alphabetical sorting of discovered apps
+-   Self-package (`com.scrollstop`) exclusion
 -   Usage calculations
 -   Remaining time
 -   Limit comparisons
