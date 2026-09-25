@@ -38,5 +38,5 @@ password/security credentials.\
 ### TD-006 --- Android Build Stack & Minimum Target APIs
 
 **Status:** Approved\
-**Decision:** Standardize on Application ID `com.scrollstop`, MinSDK 26 (Android 8.0), TargetSDK/CompileSDK 34 (Android 14), Kotlin 1.9.23, Gradle 8.7, and Jetpack Compose with Material 3.\
-**Reason:** Ensures compliance with Google Play Store target API policies while supporting over 95% of active Android devices and providing full compatibility with `UsageStatsManager` and `AccessibilityService` APIs.
+**Decision:** Standardize on Application ID `com.scrollstop`, MinSDK 26 (Android 8.0), TargetSDK/CompileSDK 36 (Android 16), Kotlin 1.9.23, Gradle 8.7, and Jetpack Compose with Material 3.\
+**Reason:** Ensures compliance with Google Play Store target API policies requiring target API 36 (Android 16) or higher as of August 31, 2026, while supporting over 95% of active Android devices and providing full compatibility with `UsageStatsManager` and `AccessibilityService` APIs.

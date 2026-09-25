@@ -10,7 +10,7 @@
 - Documentation source of truth created and organized
 - **POC-01 Android Foundation Established**:
   - Gradle 8.7 wrapper, Android Gradle Plugin 8.4.1, Kotlin 1.9.23
-  - MinSDK 26 (Android 8.0), TargetSDK 34 (Android 14 / Play compliant)
+  - MinSDK 26 (Android 8.0), TargetSDK 36 (Android 16 / Play compliant)
   - Application ID: `com.scrollstop`
   - Jetpack Compose UI foundation with dynamic Material 3 dark/light theme
   - Initial `MainScreen` with title, tagline ("Set your limit. When your time is up, we stop you."), and Development Build status card
