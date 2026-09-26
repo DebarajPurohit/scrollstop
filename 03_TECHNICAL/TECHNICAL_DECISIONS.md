@@ -47,4 +47,11 @@ password/security credentials.\
 **Decision:** Implement app discovery using `Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)` with `PackageManager.queryIntentActivities(intent, 0)` (flag `0`), backed by explicit `<queries>` launcher declaration in `AndroidManifest.xml` without requesting `QUERY_ALL_PACKAGES` permission.\
 **Reason:** Complies with Android 11+ (API 30+) package visibility requirements and Google Play Store policy. Using flag `0` instead of `MATCH_DEFAULT_ONLY` (`0x10000`) is essential because launcher activities in major third-party applications (e.g. Instagram `com.instagram.android`, Facebook `com.facebook.katana`) declare `ACTION_MAIN` + `CATEGORY_LAUNCHER` without `CATEGORY_DEFAULT` in their main launcher intent-filter. Flag `0` matches all user-launchable activities identically to Android Home Launchers while preserving strict Play Store policy compliance.
 
+### TD-008 --- UsageStatsManager Today Usage Query & Time Provider Abstraction Pattern
+
+**Status:** Approved (POC-02B)\
+**Decision:** Query today's foreground usage via `UsageStatsManager.queryAndAggregateUsageStats(beginTime, endTime)` where `beginTime` is local midnight 00:00:00 of the device's current timezone and `endTime` is `System.currentTimeMillis()`. Abstract time calculation into `TimeProvider` and UsageStats access into `UsageStatsRepository`.\
+**Reason:** `UsageStatsManager` provides the authoritative platform total foreground time metric (`UsageStats.totalTimeInForeground`). Using local midnight respects user calendar days without hardcoding UTC. Abstracting both time calculation and `UsageStatsManager` API calls allows 100% deterministic unit testing without depending on physical hardware or test device state.
+
+
 

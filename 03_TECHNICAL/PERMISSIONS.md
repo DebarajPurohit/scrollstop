@@ -2,13 +2,17 @@
 
 ## Usage Access
 
-Purpose: Read application usage statistics required to calculate daily
-usage.
+Manifest declaration: `android.permission.PACKAGE_USAGE_STATS` (with `tools:ignore="ProtectedPermissions"`).
 
-User action: User grants Usage Access through Android settings.
+Purpose: Read application usage statistics required to calculate daily foreground usage for user-selected applications to enforce user-defined limits.
 
-Failure: Protection is paused and the app explains how to restore
-access.
+User-facing explanation: "Stop Doom Scroll needs Usage Access to measure how long you use the apps you choose to control."
+
+User action: User grants Usage Access through Android settings via `Settings.ACTION_USAGE_ACCESS_SETTINGS`.
+
+State detection: Verified at runtime using `AppOpsManager.unsafeCheckOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, ...)` returning `AppOpsManager.MODE_ALLOWED`.
+
+Failure: Usage tracking is halted, UI transitions to a dedicated permission-required state, and provides a direct recovery action to open Usage Access Settings.
 
 ## Accessibility Service
 

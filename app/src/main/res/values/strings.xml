@@ -14,4 +14,15 @@
     <string name="btn_choose_apps">Choose Apps to Control</string>
     <string name="btn_back">Back</string>
     <string name="selected_apps_count">%1$d selected</string>
+    <!-- Usage Stats Strings (POC-02B) -->
+    <string name="usage_screen_title">Today\'s Usage</string>
+    <string name="btn_view_usage">View Today\'s Usage</string>
+    <string name="usage_permission_title">Usage Access Required</string>
+    <string name="usage_permission_description">Stop Doom Scroll needs Usage Access to measure how long you use the apps you choose to control.</string>
+    <string name="btn_grant_usage_access">Grant Usage Access</string>
+    <string name="usage_loading">Calculating today\'s usage…</string>
+    <string name="usage_empty_selection">No applications selected for usage tracking.</string>
+    <string name="usage_error">Failed to query usage statistics.</string>
+    <string name="btn_refresh">Refresh Usage</string>
+    <string name="todays_usage_label">Today\'s usage: %1$s</string>
 </resources>

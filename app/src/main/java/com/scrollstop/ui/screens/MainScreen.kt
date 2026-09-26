@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import com.scrollstop.ui.theme.StopDoomScrollTheme
 @Composable
 fun MainScreen(
     onNavigateToAppSelection: () -> Unit = {},
+    onNavigateToUsage: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -89,6 +91,25 @@ fun MainScreen(
                 ) {
                     Text(
                         text = stringResource(id = R.string.btn_choose_apps),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Secondary Action Button: Usage Stats Tracking POC-02B
+                OutlinedButton(
+                    onClick = onNavigateToUsage,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .semantics {
+                            contentDescription = "View Today's Usage Button"
+                        }
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.btn_view_usage),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

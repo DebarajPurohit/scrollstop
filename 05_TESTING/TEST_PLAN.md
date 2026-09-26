@@ -5,12 +5,18 @@
 -   App discovery mapping and deduplication
 -   Deterministic alphabetical sorting of discovered apps
 -   Self-package (`com.scrollstop`) exclusion
--   Usage calculations
--   Remaining time
--   Limit comparisons
--   Daily reset
--   Timezone/date handling
--   Rule evaluation
+-   Package-to-usage mapping (`AppUsageInfo`)
+-   Selected app with usage duration formatting
+-   Selected app with zero usage ("0 min")
+-   Multiple selected apps sorting & rendering
+-   Unselected app exclusion from usage results
+-   Missing package safe fallback (0 min)
+-   Duration formatting (`UsageFormatter`: sec, min, hr)
+-   Today's start/end midnight time calculation (`SystemTimeProvider`)
+-   Permission-denied state (`AppOpsManager.MODE_IGNORED`)
+-   Empty UsageStats result handling
+-   UsageStats result containing unrelated packages
+-   Timezone and daylight-saving transition handling
 
 ## Integration
 
