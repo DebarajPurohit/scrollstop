@@ -150,8 +150,7 @@ fun UsageScreen(
                     }
                     is UsageUiState.Success -> {
                         UsageListView(
-                            usageList = uiState.usageList,
-                            onRefresh = onRefresh
+                            usageList = uiState.usageList
                         )
                     }
                 }
@@ -300,8 +299,7 @@ private fun ErrorUsageView(errorMessage: String, onRetry: () -> Unit) {
 
 @Composable
 private fun UsageListView(
-    usageList: List<AppUsageInfo>,
-    onRefresh: () -> Unit
+    usageList: List<AppUsageInfo>
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
