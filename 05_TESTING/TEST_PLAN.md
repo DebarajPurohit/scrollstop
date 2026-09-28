@@ -15,8 +15,20 @@
 -   Today's start/end midnight time calculation (`SystemTimeProvider`)
 -   Permission-denied state (`AppOpsManager.MODE_IGNORED`)
 -   Empty UsageStats result handling
--   UsageStats result containing unrelated packages
 -   Timezone and daylight-saving transition handling
+-   Rules Engine: usage 0 ms, limit 2 min (NOT_STARTED, remaining 2 min)
+-   Rules Engine: usage 30 sec, limit 2 min (WITHIN_LIMIT, remaining 1 min 30 sec)
+-   Rules Engine: usage exactly 2 min (LIMIT_REACHED, remaining 0 min)
+-   Rules Engine: usage greater than 2 min (LIMIT_REACHED, remaining 0 min)
+-   Rules Engine: usage 1 ms below limit (WITHIN_LIMIT, remaining 1 ms)
+-   Rules Engine: usage 1 ms above limit (LIMIT_REACHED, remaining 0 min)
+-   Rules Engine: remaining duration never negative (guaranteed >= 0 ms)
+-   Rules Engine: multiple selected apps evaluated independently
+-   Rules Engine: unselected apps excluded from evaluation
+-   Rules Engine: UsageStats data maps with exact millisecond precision
+-   Rules Engine: repeated evaluation produces identical deterministic output
+-   Rules Engine: zero Android framework or UI dependencies in core domain engine
+
 
 ## Integration
 

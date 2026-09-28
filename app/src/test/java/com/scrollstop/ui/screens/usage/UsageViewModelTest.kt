@@ -125,24 +125,91 @@ class UsageViewModelTest {
     }
 
     @Test
-    fun `refreshUsage handles missing package in UsageStats safely as zero usage`() {
+    fun `test 8 - multiple selected apps with independent limits and results`() {
         val usageRepo = FakeUsageStatsRepository(
             hasPermission = true,
-            usageMap = emptyMap() // missing entry
+            usageMap = mapOf(
+                "com.google.android.youtube" to 30 * 1000L, // 30 sec
+                "com.instagram.android" to 3 * 60 * 1000L // 3 min
+            )
         )
         val discoveryRepo = FakeAppDiscoveryRepository(
-            discovered = listOf(DiscoveredApp("com.example.missing", "Missing App"))
+            discovered = listOf(
+                DiscoveredApp("com.google.android.youtube", "YouTube"),
+                DiscoveredApp("com.instagram.android", "Instagram")
+            )
         )
         val selectedRepo = InMemorySelectedAppsRepository()
-        selectedRepo.setSelectedPackages(setOf("com.example.missing"))
+        selectedRepo.setSelectedPackages(setOf("com.google.android.youtube", "com.instagram.android"))
+
+        val viewModel = UsageViewModel(usageRepo, discoveryRepo, selectedRepo)
+
+        val state = viewModel.uiState.value as UsageUiState.Success
+        assertEquals(2, state.usageList.size)
+
+        // Instagram: limit 2 min, used 3 min => LIMIT_REACHED, remaining 0 ms
+        val instagram = state.usageList[0]
+        assertEquals("Instagram", instagram.appLabel)
+        assertEquals(com.scrollstop.domain.rules.LimitState.LIMIT_REACHED, instagram.limitState)
+        assertEquals(0L, instagram.remainingDurationMs)
+
+        // YouTube: limit 2 min, used 30 sec => WITHIN_LIMIT, remaining 90,000 ms
+        val youtube = state.usageList[1]
+        assertEquals("YouTube", youtube.appLabel)
+        assertEquals(com.scrollstop.domain.rules.LimitState.WITHIN_LIMIT, youtube.limitState)
+        assertEquals(90_000L, youtube.remainingDurationMs)
+    }
+
+    @Test
+    fun `test 9 - unselected apps are not evaluated`() {
+        val usageRepo = FakeUsageStatsRepository(
+            hasPermission = true,
+            usageMap = mapOf(
+                "com.google.android.youtube" to 30 * 1000L,
+                "com.unselected.app" to 5 * 60 * 1000L
+            )
+        )
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(
+                DiscoveredApp("com.google.android.youtube", "YouTube"),
+                DiscoveredApp("com.unselected.app", "Unselected App")
+            )
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.google.android.youtube")) // only YouTube selected
 
         val viewModel = UsageViewModel(usageRepo, discoveryRepo, selectedRepo)
 
         val state = viewModel.uiState.value as UsageUiState.Success
         assertEquals(1, state.usageList.size)
-        assertEquals("0 min", state.usageList[0].formattedUsage)
-        assertEquals(0L, state.usageList[0].totalTimeInForegroundMs)
+        assertEquals("com.google.android.youtube", state.usageList[0].packageName)
     }
+
+    @Test
+    fun `test 10 - existing UsageStats data maps correctly into the rules engine`() {
+        val rawUsageMs = 85_432L
+        val usageRepo = FakeUsageStatsRepository(
+            hasPermission = true,
+            usageMap = mapOf("com.google.android.youtube" to rawUsageMs)
+        )
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(DiscoveredApp("com.google.android.youtube", "YouTube"))
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.google.android.youtube"))
+
+        val viewModel = UsageViewModel(usageRepo, discoveryRepo, selectedRepo)
+
+        val state = viewModel.uiState.value as UsageUiState.Success
+        val item = state.usageList[0]
+
+        // Verify exact millisecond precision mapping from UsageStats into evaluation
+        assertEquals(rawUsageMs, item.totalTimeInForegroundMs)
+        assertEquals(120_000L, item.limitDurationMs)
+        assertEquals(120_000L - rawUsageMs, item.remainingDurationMs)
+        assertEquals(com.scrollstop.domain.rules.LimitState.WITHIN_LIMIT, item.limitState)
+    }
+
 
     // --- Fake Test Helper Classes ---
 

@@ -55,6 +55,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.scrollstop.R
 import com.scrollstop.domain.model.AppUsageInfo
+import com.scrollstop.domain.rules.LimitState
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -316,7 +318,7 @@ private fun UsageListView(
 
 @Composable
 private fun UsageItemRow(item: AppUsageInfo) {
-    val usageDescription = "${item.appLabel}, ${item.packageName}, Today's usage: ${item.formattedUsage}"
+    val usageDescription = "${item.appLabel}, ${item.packageName}, Today's usage: ${item.formattedUsage}, Limit: ${item.formattedLimit}, Remaining: ${item.formattedRemaining}"
 
     Card(
         modifier = Modifier
@@ -373,10 +375,29 @@ private fun UsageItemRow(item: AppUsageInfo) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+                Text(
+                    text = stringResource(id = R.string.limit_label, item.formattedLimit),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = when (item.limitState) {
+                        LimitState.LIMIT_REACHED -> stringResource(id = R.string.status_limit_reached)
+                        else -> stringResource(id = R.string.remaining_label, item.formattedRemaining)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = when (item.limitState) {
+                        LimitState.LIMIT_REACHED -> MaterialTheme.colorScheme.error
+                        LimitState.WITHIN_LIMIT -> MaterialTheme.colorScheme.tertiary
+                        LimitState.NOT_STARTED -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
             }
         }
     }
 }
+
 
 @Composable
 private fun AppIconImage(

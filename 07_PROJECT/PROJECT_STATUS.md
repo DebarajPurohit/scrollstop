@@ -1,7 +1,7 @@
 # Project Status
 
-**Date:** 2026-09-26\
-**Stage:** POC-02B Implementation Complete --- UsageStatsManager Tracking Established
+**Date:** 2026-09-28\
+**Stage:** POC-03 Implementation & Verification Complete --- Usage Limit + Rules Engine Established
 
 ## Completed
 
@@ -29,32 +29,35 @@
   - State-based screen switching in `AppNavigation`
   - 100% unit and UI test suite coverage using Robolectric (`PackageManagerAppDiscoveryRepositoryTest`, `AppSelectionViewModelTest`, `AppSelectionScreenTest`)
   - Verified `./gradlew assembleDebug` build and `./gradlew testDebugUnitTest` (100% pass rate)
-- **POC-02B Usage Tracking Feasibility Established**:
-  - `android.permission.PACKAGE_USAGE_STATS` declared in `AndroidManifest.xml`
-  - `AndroidUsageStatsRepository` backing usage queries via `UsageStatsManager.queryAndAggregateUsageStats` and runtime permission checks via `AppOpsManager.OPSTR_GET_USAGE_STATS`
-  - `SystemTimeProvider` calculating start of local calendar day (00:00:00) using device local timezone
-  - In-memory `SelectedAppsRepository` decoupling app selection and usage tracking components
-  - `UsageFormatter` formatting usage duration strings ("23 min 41 sec", "8 min 12 sec", "0 min")
-  - `UsageViewModel` and `UsageUiState` managing state transitions (PermissionRequired, Loading, EmptySelection, Success, Error)
-  - `UsageScreen` Jetpack Compose UI with explicit permission card ("Grant Usage Access" launching `Settings.ACTION_USAGE_ACCESS_SETTINGS`), manual refresh action, state handlers, and lifecycle observer for auto-refresh on return from Settings
-  - 32 automated unit and UI rendering tests using Robolectric (100% pass rate)
-  - Verified `./gradlew assembleDebug` build and `./gradlew testDebugUnitTest` (100% pass rate)
+- **POC-02B Usage Tracking Feasibility CLOSED AS PASS**:
+  - Physically validated `UsageStatsManager` tracking on physical Android hardware.
+  - Successfully reported real YouTube usage, with repeated refresh accurately showing usage increasing from 1 hr 50 min 17 sec to 1 hr 50 min 22 sec.
+  - `AndroidUsageStatsRepository` backing usage queries via `UsageStatsManager.queryAndAggregateUsageStats` and runtime permission checks via `AppOpsManager.OPSTR_GET_USAGE_STATS`.
+- **POC-03 Usage Limit + Rules Engine Feasibility Established**:
+  - Pure, deterministic domain-level `UsageRuleEngine` (`com.scrollstop.domain.rules`) evaluating daily usage against limits with zero dependencies on Android framework, Context, Compose, wall-clock time, background timers, or network calls.
+  - Defined explicit limit states: `NOT_STARTED`, `WITHIN_LIMIT`, `LIMIT_REACHED`.
+  - Exposed exact used duration, limit duration, remaining duration (guaranteed >= 0 ms), and deterministic limit state with exact millisecond precision.
+  - `DailyLimitRepository` managing user-configured daily limits in memory with controlled 2-minute POC default (`DEFAULT_POC_LIMIT_MS = 120,000 ms`).
+  - Integrated `UsageStatsManager` → `UsageStatsRepository` → `AppUsageInfo` → `UsageRuleEngine` → `UsageViewModel` → Compose UI.
+  - 46 automated unit and UI component tests passing (100% pass rate) using JDK 21 and Robolectric.
+  - Verified `./gradlew.bat testDebugUnitTest --rerun-tasks` and `./gradlew.bat assembleDebug` builds.
 
 ## In Progress
 
-- Physical device validation and controlled accuracy testing of `UsageStatsManager` reporting delays on real hardware.
+- Physical device validation of POC-03 temporary 2-minute daily limit evaluation against real UsageStatsManager output on hardware.
 
 ## Pending
 
-- Accessibility Service enforcement trigger POC
-- 2-minute end-to-end limit & blocking loop validation
+- POC-04: Accessibility Service enforcement trigger & narrow detection POC
+- 2-minute end-to-end limit & blocking overlay loop validation
 - OEM battery restriction & reboot lifecycle testing
 
 ## Current Next Action
 
-Perform physical device validation and controlled accuracy testing for POC-02B on physical Android hardware.
+Execute physical device testing of POC-03 with real YouTube usage stats against the 2-minute temporary POC limit.
 
 ## Documentation Rule
 
 Update this file whenever project stage, major milestone, blocker or next action changes.
+
 

@@ -53,5 +53,12 @@ password/security credentials.\
 **Decision:** Query today's foreground usage via `UsageStatsManager.queryAndAggregateUsageStats(beginTime, endTime)` where `beginTime` is local midnight 00:00:00 of the device's current timezone and `endTime` is `System.currentTimeMillis()`. Abstract time calculation into `TimeProvider` and UsageStats access into `UsageStatsRepository`.\
 **Reason:** `UsageStatsManager` provides the authoritative platform total foreground time metric (`UsageStats.totalTimeInForeground`). Using local midnight respects user calendar days without hardcoding UTC. Abstracting both time calculation and `UsageStatsManager` API calls allows 100% deterministic unit testing without depending on physical hardware or test device state.
 
+### TD-009 --- Pure Domain-Level Rules Engine Architecture & In-Memory Limit Repository
+
+**Status:** Approved (POC-03)\
+**Decision:** Implement `UsageRuleEngine` as a pure Kotlin component in `com.scrollstop.domain.rules` with zero dependencies on Android framework (`android.*`), Jetpack Compose (`androidx.compose.*`), wall-clock time, timers, background loops, or network calls. The engine takes `packageName`, `usedDurationMs`, and `limitDurationMs` and returns a deterministic `LimitEvaluationResult` with `LimitState` (`NOT_STARTED`, `WITHIN_LIMIT`, `LIMIT_REACHED`). Daily limits are configured via `DailyLimitRepository` (defaulting to 2 minutes / 120,000 ms for POC feasibility).\
+**Reason:** Decoupling rules evaluation into a pure domain layer guarantees 100% reproducible unit testing, millisecond precision preservation, and zero risk of UI/Android framework side effects before integrating enforcement/blocking triggers.
+
+
 
 

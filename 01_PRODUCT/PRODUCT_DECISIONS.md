@@ -29,8 +29,16 @@ core product.
 validation phase.\
 **Reason:** It directly supports the product's commitment proposition.
 
+### PD-005 --- Deterministic Rules Engine Feasibility & Temporary 2-Minute Limits
+
+**Status:** Approved (POC-03)\
+**Decision:** Evaluate daily usage against user-configured daily limits using a pure, deterministic domain-level rules engine (`UsageRuleEngine`). For POC-03 feasibility validation, adopt a 2-minute temporary daily limit per selected application.\
+**Reason:** Ensures enforcement decision logic is 100% testable, pure, and decoupled from Android framework APIs and UI layers before implementing AccessibilityService enforcement.
+
 ### Change Log
 
   Date         Change                       Reason
   ------------ ---------------------------- ------------------
   2026-09-24   Initial decisions recorded   Project baseline
+  2026-09-28   Recorded PD-005              POC-03 Rules Engine feasibility
+
