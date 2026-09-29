@@ -33,6 +33,7 @@ import com.scrollstop.ui.theme.StopDoomScrollTheme
 fun MainScreen(
     onNavigateToAppSelection: () -> Unit = {},
     onNavigateToUsage: () -> Unit = {},
+    onNavigateToAccessibilityConsent: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -110,6 +111,25 @@ fun MainScreen(
                 ) {
                     Text(
                         text = stringResource(id = R.string.btn_view_usage),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Action Button: Accessibility Service Permission & Disclosure (POC-04)
+                OutlinedButton(
+                    onClick = onNavigateToAccessibilityConsent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .semantics {
+                            contentDescription = "Accessibility Permission & Disclosure Button"
+                        }
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.btn_accessibility_disclosure),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

@@ -16,16 +16,29 @@ Failure: Usage tracking is halted, UI transitions to a dedicated permission-requ
 
 ## Accessibility Service
 
-Purpose: Detect access to selected restricted applications and enforce
-predefined blocking rules.
+Manifest declaration: `android.permission.BIND_ACCESSIBILITY_SERVICE` on `RestrictedAppAccessibilityService`.
 
-Restrictions: - No unrelated screen-content collection - No messages -
-No keystroke collection - No autonomous decisions - No unrelated
-monitoring
+Purpose: Detect entry into user-selected restricted applications on `TYPE_WINDOW_STATE_CHANGED` events to evaluate predefined rules and produce deterministic enforcement triggers.
 
-User action: User explicitly enables the service.
+Non-Accessibility Tool Disclosure: Stop Doom Scroll is NOT an accessibility tool for users with disabilities (`isAccessibilityTool="true"` is NOT set).
 
-Failure: Protection is paused and the app provides a recovery path.
+Explicit Consent: Prominent disclosure screen (`AccessibilityConsentScreen`) must be displayed and affirmative consent given BEFORE directing the user to `Settings.ACTION_ACCESSIBILITY_SETTINGS`.
+
+Restrictions:
+- `canRetrieveWindowContent="false"` explicitly enforced in XML and service configuration.
+- No unrelated screen-content collection.
+- No messages, passwords, text, or keystroke collection.
+- No autonomous actions, gestures, touch exploration, or system settings modification.
+- Package filtering dynamically restricted to user-selected package set.
+
+Service Health States:
+- `ACCESSIBILITY_NOT_GRANTED`: Service disabled in settings or permission missing. Protection is paused.
+- `ACCESSIBILITY_ACTIVE`: Service connected and actively evaluating foreground app entries.
+- `ACCESSIBILITY_INTERRUPTED`: Service connected but temporarily interrupted by system. Protection is paused.
+
+User action: User reads prominent disclosure and explicitly clicks consent button to open Android Accessibility settings.
+
+Failure / Service Interruption: System detects status as `ACCESSIBILITY_NOT_GRANTED` or `ACCESSIBILITY_INTERRUPTED`, pauses protection, and displays a prominent recovery button to re-enable service.
 
 ## Package Visibility
 
@@ -34,7 +47,9 @@ This approach avoids `QUERY_ALL_PACKAGES` permission and ensures strict Play Sto
 
 ## Principle
 
-Every permission must have: 1. Clear user-facing explanation 2. Specific
-product purpose 3. Failure state 4. Recovery flow 5. Required Play
-disclosure/handling
-
+Every permission must have:
+1. Clear user-facing explanation
+2. Specific product purpose
+3. Failure state
+4. Recovery flow
+5. Required Play disclosure/handling

@@ -5,10 +5,25 @@
 Collect/store only what is required for usage tracking, limits,
 enforcement and history.
 
-## AccessibilityService
+## AccessibilityService Privacy & Security Boundaries
 
-Use only for the narrow enforcement purpose. Never collect messages,
-passwords, keystrokes or unrelated screen content.
+AccessibilityService (`RestrictedAppAccessibilityService`) is restricted by strict security rules:
+
+**EXPLICITLY ALLOWED ACCESS:**
+- `event.packageName` string on `TYPE_WINDOW_STATE_CHANGED` events.
+- Verification of package against user-selected restricted package set.
+- Emission of internal deterministic `EnforcementTrigger` when `UsageRuleEngine` evaluates `LIMIT_REACHED`.
+
+**EXPLICITLY PROHIBITED ACCESS (Enforced by Configuration & Architecture):**
+- Screen text extraction or window node inspection (`canRetrieveWindowContent="false"`).
+- Reading user messages, chat content, emails, or personal documents.
+- Capturing passwords, credentials, PINs, or sensitive fields.
+- Keylogging or keystroke collection (`canRequestFilterKeyEvents="false"`).
+- Touch exploration or screen gestures (`canPerformGestures="false"`).
+- Screenshots or screen recording.
+- Performing autonomous clicks, taps, or navigation inside third-party apps.
+- Modifying system settings or device configuration.
+- Transmitting accessibility event data over network (0 network permissions declared).
 
 ## Credentials
 
@@ -17,25 +32,20 @@ authentication data.
 
 ## Logging
 
-Do not log sensitive usage details unnecessarily. Production logs should
-be minimal and sanitized.
+Do not log sensitive usage details unnecessarily. Log only sanitized package names, event type, and deterministic state. Prefer no persistent logging.
 
 ## Local Storage
 
-Protect stored data using Android platform security mechanisms. Avoid
-unnecessary export/share paths.
+Protect stored data using Android platform security mechanisms (`SharedPreferences`). Avoid unnecessary export/share paths.
 
 ## Privacy
 
-Explain data access and permission purpose before requesting sensitive
-capabilities.
+Explain data access and permission purpose in a prominent in-app disclosure before requesting sensitive capabilities. Require explicit affirmative consent.
 
 ## Enforcement
 
-Blocking decisions must be based on explicit local rules, not hidden
-heuristics or AI.
+Blocking decisions must be based on explicit local rules evaluated by `UsageRuleEngine`, not hidden heuristics, AI, or background timers.
 
 ## Release
 
-Privacy policy, Data Safety information and Play declarations must match
-actual implementation.
+Privacy policy, Data Safety information and Play declarations must match actual implementation. Never set `isAccessibilityTool="true"`.

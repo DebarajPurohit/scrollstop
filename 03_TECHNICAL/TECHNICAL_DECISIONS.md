@@ -59,6 +59,13 @@ password/security credentials.\
 **Decision:** Implement `UsageRuleEngine` as a pure Kotlin component in `com.scrollstop.domain.rules` with zero dependencies on Android framework (`android.*`), Jetpack Compose (`androidx.compose.*`), wall-clock time, timers, background loops, or network calls. The engine takes `packageName`, `usedDurationMs`, and `limitDurationMs` and returns a deterministic `LimitEvaluationResult` with `LimitState` (`NOT_STARTED`, `WITHIN_LIMIT`, `LIMIT_REACHED`). Daily limits are configured via `DailyLimitRepository` (defaulting to 2 minutes / 120,000 ms for POC feasibility).\
 **Reason:** Decoupling rules evaluation into a pure domain layer guarantees 100% reproducible unit testing, millisecond precision preservation, and zero risk of UI/Android framework side effects before integrating enforcement/blocking triggers.
 
+### TD-010 --- Narrow AccessibilityService Architecture, SharedPreferences Persistence, & Event Filtering
 
-
-
+**Status:** Approved (POC-04)\
+**Decision:** 
+1. Implement `RestrictedAppAccessibilityService` configured with `TYPE_WINDOW_STATE_CHANGED` events only and `canRetrieveWindowContent="false"`.
+2. Persist selected apps and limits via `SharedPreferencesSelectedAppsRepository` and `SharedPreferencesDailyLimitRepository` so background services access the same state as UI ViewModels.
+3. On window state event, extract `event.packageName` ONLY, check selected packages, query `UsageStatsRepository`, and evaluate using `UsageRuleEngine`. If `LIMIT_REACHED`, emit `EnforcementTrigger`.
+4. Dynamically update package filtering in `setServiceInfo(...)` based on selected packages flow.
+5. Provide `AccessibilityServiceHealthRepository` to observe service states (`ACCESSIBILITY_NOT_GRANTED`, `ACCESSIBILITY_ACTIVE`, `ACCESSIBILITY_INTERRUPTED`).\
+**Reason:** Strict privacy and Play Store compliance. Does NOT inspect window text, view hierarchy, messages, passwords, or keystrokes. Does NOT run background loops or duplicate usage timing.

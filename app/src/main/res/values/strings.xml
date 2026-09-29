@@ -14,6 +14,7 @@
     <string name="btn_choose_apps">Choose Apps to Control</string>
     <string name="btn_back">Back</string>
     <string name="selected_apps_count">%1$d selected</string>
+
     <!-- Usage Stats & Rules Engine Strings (POC-03) -->
     <string name="usage_screen_title">Today\'s Usage</string>
     <string name="btn_view_usage">View Today\'s Usage</string>
@@ -30,5 +31,16 @@
     <string name="status_not_started">NOT STARTED</string>
     <string name="status_within_limit">WITHIN LIMIT</string>
     <string name="status_limit_reached">LIMIT REACHED</string>
-</resources>
 
+    <!-- Accessibility Service & Prominent Disclosure Strings (POC-04) -->
+    <string name="accessibility_service_label">Stop Doom Scroll Detection Service</string>
+    <string name="accessibility_service_description">Detects when selected restricted apps are opened to enforce user-configured daily limits.</string>
+    <string name="accessibility_disclosure_title">Accessibility Service Prominent Disclosure</string>
+    <string name="accessibility_disclosure_body">Stop Doom Scroll uses Android\'s AccessibilityService API solely to detect when you open an application that you have selected for usage control.\n\nPurpose:\n• Detect entry into your selected restricted apps.\n• Enforce your predefined daily app limits.\n\nPrivacy Guarantee:\n• Stop Doom Scroll DOES NOT read your messages, passwords, text, keystrokes, photos, or screen contents.\n• Stop Doom Scroll DOES NOT perform actions inside other apps or change system settings.\n• Stop Doom Scroll is NOT an accessibility tool for users with disabilities.</string>
+    <string name="btn_grant_accessibility_consent">I Consent / Grant Permission</string>
+    <string name="btn_accessibility_disclosure">Accessibility Permission &amp; Disclosure</string>
+    <string name="accessibility_status_active">ACCESSIBILITY ACTIVE</string>
+    <string name="accessibility_status_not_granted">ACCESSIBILITY NOT GRANTED</string>
+    <string name="accessibility_status_interrupted">ACCESSIBILITY INTERRUPTED</string>
+    <string name="trigger_received_message">Enforcement Trigger Fired: %1$s (Limit Reached)</string>
+</resources>

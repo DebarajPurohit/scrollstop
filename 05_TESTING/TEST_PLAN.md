@@ -1,6 +1,6 @@
 # Test Plan
 
-## Unit
+## Unit Tests
 
 -   App discovery mapping and deduplication
 -   Deterministic alphabetical sorting of discovered apps
@@ -29,25 +29,39 @@
 -   Rules Engine: repeated evaluation produces identical deterministic output
 -   Rules Engine: zero Android framework or UI dependencies in core domain engine
 
+### POC-04 Accessibility Detection & Trigger Test Suite
+
+1.  Detection Engine: null event / null package -> ignored (returns null)
+2.  Detection Engine: wrong event type (non-TYPE_WINDOW_STATE_CHANGED) -> ignored (returns null)
+3.  Detection Engine: empty or blank package -> ignored (returns null)
+4.  Detection Engine: Stop Doom Scroll self-package (`com.scrollstop`) -> ignored (returns null)
+5.  Detection Engine: unselected package -> ignored (returns null)
+6.  Detection Engine: selected package + NOT_STARTED -> no enforcement trigger (returns null)
+7.  Detection Engine: selected package + WITHIN_LIMIT -> no enforcement trigger (returns null)
+8.  Detection Engine: selected package + LIMIT_REACHED -> produces deterministic EnforcementTrigger
+9.  Detection Engine: selected package with usage over limit -> produces deterministic EnforcementTrigger
+10. Detection Engine: repeated identical event evaluated deterministically without runaway loops
+11. Detection Engine: multiple selected apps evaluated independently
+12. Detection Engine: changing selected-app set is respected dynamically
+13. Service Security: service configuration explicitly prohibits window content retrieval (`canRetrieveWindowContent == false`)
+14. Service Configuration: service subscribes only to `TYPE_WINDOW_STATE_CHANGED` and narrow package filtering
+15. Privacy Boundary: event processing accesses ONLY packageName string
+16. Health Repository: service health correctly reports active, unavailable, and interrupted states
 
 ## Integration
 
 -   UsageStatsManager → Usage Engine
 -   Usage Engine → Rules Engine
--   Accessibility event → Rules Engine
--   Rules Engine → Blocking Layer
--   Permission health checks
+-   AccessibilityEvent → RestrictedAppDetectionEngine → UsageRuleEngine → EnforcementTrigger
+-   SharedPreferencesSelectedAppsRepository & SharedPreferencesDailyLimitRepository persistence
+-   Permission & Service health checks
 
 ## UI
 
--   Onboarding
--   Permission guidance
--   App selection
--   Limit configuration
--   Dashboard
--   Blocking screen
--   History
--   Recovery states
+-   MainScreen navigation to App Selection, Usage Tracking, and Accessibility Disclosure
+-   Prominent Disclosure UI displaying non-accessibility-tool disclosure and privacy guarantee
+-   Grant Accessibility Permission button opening system settings
+-   Internal EnforcementTrigger detection display indicator
 
 ## Critical Enforcement
 
@@ -66,12 +80,11 @@
 
 ## Security/Privacy
 
-Verify no unrelated accessibility data, messages, keystrokes or
-unnecessary logs are collected.
+Verify no unrelated accessibility data, messages, text, passwords, keystrokes, screenshots or unnecessary logs are collected.
 
 ## Performance
 
-Measure startup, blocking response and battery impact.
+Measure event handling speed (< 5ms per event), memory usage, and battery impact. Zero background loops or timers.
 
 ## Release Gate
 

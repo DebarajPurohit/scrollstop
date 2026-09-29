@@ -1,7 +1,7 @@
 # Project Status
 
-**Date:** 2026-09-28\
-**Stage:** POC-03 Implementation & Verification Complete --- Usage Limit + Rules Engine Established
+**Date:** 2026-09-29\
+**Stage:** POC-04 Implementation & Automated Verification Complete --- Accessibility Service Narrow Detection & Enforcement Trigger Established
 
 ## Completed
 
@@ -33,31 +33,37 @@
   - Physically validated `UsageStatsManager` tracking on physical Android hardware.
   - Successfully reported real YouTube usage, with repeated refresh accurately showing usage increasing from 1 hr 50 min 17 sec to 1 hr 50 min 22 sec.
   - `AndroidUsageStatsRepository` backing usage queries via `UsageStatsManager.queryAndAggregateUsageStats` and runtime permission checks via `AppOpsManager.OPSTR_GET_USAGE_STATS`.
-- **POC-03 Usage Limit + Rules Engine Feasibility Established**:
+- **POC-03 Usage Limit + Rules Engine Feasibility CLOSED AS PASS**:
   - Pure, deterministic domain-level `UsageRuleEngine` (`com.scrollstop.domain.rules`) evaluating daily usage against limits with zero dependencies on Android framework, Context, Compose, wall-clock time, background timers, or network calls.
   - Defined explicit limit states: `NOT_STARTED`, `WITHIN_LIMIT`, `LIMIT_REACHED`.
   - Exposed exact used duration, limit duration, remaining duration (guaranteed >= 0 ms), and deterministic limit state with exact millisecond precision.
-  - `DailyLimitRepository` managing user-configured daily limits in memory with controlled 2-minute POC default (`DEFAULT_POC_LIMIT_MS = 120,000 ms`).
+  - `DailyLimitRepository` managing user-configured daily limits with controlled 2-minute POC default (`DEFAULT_POC_LIMIT_MS = 120,000 ms`).
   - Integrated `UsageStatsManager` → `UsageStatsRepository` → `AppUsageInfo` → `UsageRuleEngine` → `UsageViewModel` → Compose UI.
-  - 46 automated unit and UI component tests passing (100% pass rate) using JDK 21 and Robolectric.
+  - Physical device validation completed: YouTube usage 2 hr 32 min 09 sec against 2-minute POC limit physically validated and displayed `LIMIT REACHED`.
+- **POC-04 Accessibility Service Enforcement Trigger & Narrow App Detection CLOSED AS IMPLEMENTED**:
+  - `RestrictedAppAccessibilityService` declared with `TYPE_WINDOW_STATE_CHANGED` events, `canRetrieveWindowContent="false"`, and `isAccessibilityTool="false"`.
+  - `RestrictedAppDetectionEngine` extracting `event.packageName` ONLY, validating against selected package set, querying `UsageStatsRepository`, and evaluating rule state via `UsageRuleEngine`.
+  - `EnforcementTrigger` produced ONLY when limit state is `LIMIT_REACHED`.
+  - Prominent in-app disclosure screen (`AccessibilityConsentScreen`) explaining usage purpose, non-accessibility-tool positioning, and privacy guarantees with explicit user consent button.
+  - `AccessibilityServiceHealthRepository` tracking service states (`ACCESSIBILITY_NOT_GRANTED`, `ACCESSIBILITY_ACTIVE`, `ACCESSIBILITY_INTERRUPTED`).
+  - Persistent repository storage via `SharedPreferencesSelectedAppsRepository` and `SharedPreferencesDailyLimitRepository`.
+  - Centralized `ServiceLocator` providing shared singletons across UI and background service.
+  - 67 automated unit and UI component tests passing (100% pass rate) using JDK 21 and Robolectric.
   - Verified `./gradlew.bat testDebugUnitTest --rerun-tasks` and `./gradlew.bat assembleDebug` builds.
 
 ## In Progress
 
-- Physical device validation of POC-03 temporary 2-minute daily limit evaluation against real UsageStatsManager output on hardware.
+- Physical device validation of POC-04 Accessibility Service enable flow, YouTube detection trigger, non-selected app ignore, and service interruption handling.
 
 ## Pending
 
-- POC-04: Accessibility Service enforcement trigger & narrow detection POC
-- 2-minute end-to-end limit & blocking overlay loop validation
+- POC-05: Blocking UI / Overlay / Screen enforcement POC
 - OEM battery restriction & reboot lifecycle testing
 
 ## Current Next Action
 
-Execute physical device testing of POC-03 with real YouTube usage stats against the 2-minute temporary POC limit.
+Execute physical device testing of POC-04 on Android hardware.
 
 ## Documentation Rule
 
 Update this file whenever project stage, major milestone, blocker or next action changes.
-
-

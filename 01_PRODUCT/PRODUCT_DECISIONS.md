@@ -35,10 +35,16 @@ validation phase.\
 **Decision:** Evaluate daily usage against user-configured daily limits using a pure, deterministic domain-level rules engine (`UsageRuleEngine`). For POC-03 feasibility validation, adopt a 2-minute temporary daily limit per selected application.\
 **Reason:** Ensures enforcement decision logic is 100% testable, pure, and decoupled from Android framework APIs and UI layers before implementing AccessibilityService enforcement.
 
+### PD-006 --- AccessibilityService Narrow Foreground Detection Trigger
+
+**Status:** Approved (POC-04)\
+**Decision:** AccessibilityService is utilized strictly as a narrow, deterministic foreground-app entry detection trigger for the user's selected restricted apps, requiring explicit in-app prominent disclosure and affirmative consent.\
+**Reason:** Stop Doom Scroll is NOT an accessibility tool for users with disabilities. AccessibilityService is used only to extract `packageName` on `TYPE_WINDOW_STATE_CHANGED` events to evaluate `UsageRuleEngine` limit states, without inspecting screen content, text, passwords, or keystrokes.
+
 ### Change Log
 
   Date         Change                       Reason
   ------------ ---------------------------- ------------------
   2026-09-24   Initial decisions recorded   Project baseline
   2026-09-28   Recorded PD-005              POC-03 Rules Engine feasibility
-
+  2026-09-29   Recorded PD-006              POC-04 AccessibilityService narrow trigger
