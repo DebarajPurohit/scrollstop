@@ -17,13 +17,18 @@
 
 UsageStatsManager → Usage Engine → Rules Engine → UI
 
-AccessibilityService → Rules Engine → Blocking Layer
+AccessibilityService (Foreground Window State Detection)
+  → LiveLimitEnforcementEngine (Immediate check + Scoped 5s loop while restricted app is foreground)
+  → UsageStatsManager (Authoritative query)
+  → Rules Engine (Evaluate limit)
+  → EnforcementTrigger
+  → Blocking Layer (MainActivity BlockingScreen)
 
 ## Responsibilities
 
 ### UsageStatsManager
 
-Source of truth for usage measurements.
+Single source of truth for accumulated usage measurements. No duplicate usage counter is maintained.
 
 ### Usage Engine
 
@@ -32,16 +37,19 @@ allowance.
 
 ### Rules Engine
 
-Deterministic evaluation of user-configured limits and protection state.
+Deterministic evaluation of user-configured limits and protection state (`UsageRuleEngine`). Single source of truth for `LIMIT_REACHED`.
 
-### AccessibilityService
+### AccessibilityService & LiveLimitEnforcementEngine
 
-Narrow detection/enforcement mechanism for selected restricted packages.
-It must not collect unrelated screen content, messages or keystrokes.
+Narrow detection and live monitoring mechanism for selected restricted packages:
+- Detects foreground package changes via `TYPE_WINDOW_STATE_CHANGED`.
+- Scopes continuous 5s UsageStats queries strictly to active foreground restricted app.
+- Stops immediately upon app switch, unselected app, self-package, or service interruption.
+- Strictly does not collect unrelated screen content, text, passwords, or keystrokes.
 
 ### Blocking Layer
 
-Displays/enforces the user-facing blocked state.
+Displays/enforces the user-facing blocked state (`BlockingScreen`).
 
 ## Architecture Principles
 

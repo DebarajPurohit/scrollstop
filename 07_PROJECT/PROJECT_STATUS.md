@@ -1,7 +1,7 @@
 # Project Status
 
 **Date:** 2026-10-08\
-**Stage:** POC-05 Implementation & Automated Verification Complete --- Blocking UI & Enforcement Loop Feasibility PASSED
+**Stage:** POC-05A Implementation & Automated Verification Complete --- Live Limit-Crossing Continuous Enforcement (PHYSICAL VALIDATION PENDING)
 
 ## Completed
 
@@ -13,26 +13,28 @@
 - **POC-02B Usage Tracking Feasibility**: PASS
 - **POC-03 Usage Limit + Rules Engine Feasibility**: PASS
 - **POC-04 Accessibility Service Enforcement Trigger & Narrow App Detection**: PASS
-- **POC-05 Blocking UI & Enforcement Loop CLOSED AS PASS**:
-  - Full end-to-end enforcement loop established: Monitored Package Entry -> `RestrictedAppAccessibilityService` -> `RestrictedAppDetectionEngine` -> `UsageStatsRepository` -> `UsageRuleEngine` -> `EnforcementTrigger` -> `BlockingScreen` (`MainActivity`).
-  - `BlockingViewModel` loading empirical app label, today's usage, daily limit, and limit state directly from trusted repositories and domain rules engine.
-  - `BlockingScreen` UI presenting "Time's up", app label, today's usage, daily limit, and reset notice ("Access will be available again after daily reset (midnight).").
-  - Back navigation isolation via `BackHandler` navigating to Stop Doom Scroll dashboard (`Screen.Main`), preventing direct return to restricted apps.
-  - Repeated launch handling: Re-entering restricted app when limit is reached immediately triggers `RestrictedAppAccessibilityService` -> `startActivity` -> `onNewIntent` -> redisplays `BlockingScreen`.
-  - Under-limit and unselected app paths verified: Unselected apps or selected apps within limit produce NO trigger and NO blocking screen.
-  - Play-compliant Activity launching: Uses standard `Intent.FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_SINGLE_TOP` from `AccessibilityService` context without `SYSTEM_ALERT_WINDOW` overlays, screen scraping, or device-admin abuse.
-  - 100% automated test suite pass rate (all unit & component tests passing cleanly).
-  - Clean build verified: `./gradlew assembleDebug` and `./gradlew testDebugUnitTest` passing 100%.
+- **POC-05 Blocking UI & Enforcement Loop**: PASS
+- **POC-05A Live Limit-Crossing Continuous Enforcement: IMPLEMENTATION PASS — PHYSICAL VALIDATION PENDING**:
+  - Live continuous foreground monitoring via `LiveLimitEnforcementEngine` in `domain.detection`.
+  - Immediate evaluation on package entry preserves instant POC-05 blocking for already-over-limit apps.
+  - Continuous 5-second polling loop re-evaluates authoritative `UsageStatsManager` usage against `UsageRuleEngine` strictly while a selected restricted app remains continuously in the foreground.
+  - Zero duplicate monitors / coroutine jobs: guarded by synchronized lock and package validation.
+  - Immediate cancellation upon app switch (to unselected app, other restricted app, launcher, or Stop Doom Scroll self-package).
+  - Immediate cancellation upon limit breach trigger and during service interruption (`onInterrupt`, `onUnbind`, `onDestroy`).
+  - No independent usage timer, no countdown, no screen scraping, no overlay permission.
+  - 16 comprehensive automated unit tests covering all edge cases, lifecycle transitions, midnight reset, and thread safety.
+  - 100% automated test suite pass rate across the entire project (`./gradlew testDebugUnitTest`).
+  - Clean build verified: `./gradlew assembleDebug` passing cleanly.
 
 ## Pending
 
-- Physical device validation execution & OEM observation recording
+- Physical continuous-foreground limit-crossing validation on target hardware (Tests A–E)
 - Commitment Lock (Phase 2)
 - Advanced anti-bypass protection & OEM battery restriction handling (Phase 2)
 
 ## Current Next Action
 
-Physical device test execution of POC-05 on target hardware.
+Execute physical device validation of POC-05A on target hardware (Test A: Continuous foreground limit crossing).
 
 ## Documentation Rule
 

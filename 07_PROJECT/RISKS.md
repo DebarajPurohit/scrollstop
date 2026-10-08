@@ -26,9 +26,9 @@
               requirements                 no claim as accessibility tool (`isAccessibilityTool="false"`),
               on Accessibility             `canRetrieveWindowContent="false"`, narrow package filter
 
-  R-006       Battery impact  Medium      Low          Narrow event subscription (`TYPE_WINDOW_STATE_CHANGED`), Open (POC-04)
-              reduces                      zero background loops, zero continuous timers    
-              retention                                                                     
+  R-006       Battery impact  Medium      Low          Narrow event subscription (`TYPE_WINDOW_STATE_CHANGED`), Mitigated (POC-05A)
+              reduces                      5s check strictly scoped to active foreground    
+              retention                    restricted app (0 checks anywhere else)          
 
   R-007       Users distrust  High        Medium       In-app prominent disclosure explaining strict privacy Open (POC-04)
               sensitive                    guarantee (no screen/text/password collection)   

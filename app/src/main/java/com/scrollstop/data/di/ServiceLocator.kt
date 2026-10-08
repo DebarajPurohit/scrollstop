@@ -74,6 +74,9 @@ object ServiceLocator {
         }
     }
 
+    @Volatile
+    private var liveLimitEnforcementEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine? = null
+
     fun getAccessibilityHealthRepository(): AccessibilityServiceHealthRepository {
         return accessibilityHealthRepository ?: synchronized(this) {
             accessibilityHealthRepository ?: AndroidAccessibilityServiceHealthRepository().also {
@@ -90,13 +93,37 @@ object ServiceLocator {
         }
     }
 
+    fun getLiveLimitEnforcementEngine(
+        context: Context,
+        scope: kotlinx.coroutines.CoroutineScope,
+        checkIntervalMs: Long = com.scrollstop.domain.detection.LiveLimitEnforcementEngine.DEFAULT_CHECK_INTERVAL_MS,
+        onTriggerEmitted: ((com.scrollstop.domain.model.EnforcementTrigger) -> Unit)? = null
+    ): com.scrollstop.domain.detection.LiveLimitEnforcementEngine {
+        return liveLimitEnforcementEngine ?: synchronized(this) {
+            liveLimitEnforcementEngine ?: com.scrollstop.domain.detection.LiveLimitEnforcementEngine(
+                selectedAppsRepository = getSelectedAppsRepository(context),
+                dailyLimitRepository = getDailyLimitRepository(context),
+                usageStatsRepository = getUsageStatsRepository(context),
+                usageRuleEngine = getUsageRuleEngine(),
+                enforcementTriggerRepository = getEnforcementTriggerRepository(context),
+                selfPackageName = context.packageName,
+                checkIntervalMs = checkIntervalMs,
+                scope = scope,
+                onTriggerEmitted = onTriggerEmitted
+            ).also {
+                liveLimitEnforcementEngine = it
+            }
+        }
+    }
+
     fun resetForTesting(
         selectedAppsRepo: SelectedAppsRepository? = null,
         dailyLimitRepo: DailyLimitRepository? = null,
         usageStatsRepo: UsageStatsRepository? = null,
         triggerRepo: EnforcementTriggerRepository? = null,
         healthRepo: AccessibilityServiceHealthRepository? = null,
-        ruleEngine: UsageRuleEngine? = null
+        ruleEngine: UsageRuleEngine? = null,
+        liveEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine? = null
     ) {
         selectedAppsRepository = selectedAppsRepo
         dailyLimitRepository = dailyLimitRepo
@@ -104,5 +131,6 @@ object ServiceLocator {
         enforcementTriggerRepository = triggerRepo
         accessibilityHealthRepository = healthRepo
         usageRuleEngine = ruleEngine
+        liveLimitEnforcementEngine = liveEngine
     }
 }

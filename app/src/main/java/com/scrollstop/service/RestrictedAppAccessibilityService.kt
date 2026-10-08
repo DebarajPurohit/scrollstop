@@ -45,6 +45,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
     private lateinit var enforcementTriggerRepository: EnforcementTriggerRepository
     private lateinit var healthRepository: AccessibilityServiceHealthRepository
     private lateinit var detectionEngine: RestrictedAppDetectionEngine
+    internal lateinit var liveEnforcementEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -64,6 +65,19 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
             usageRuleEngine = ruleEngine,
             selfPackageName = packageName
         )
+
+        liveEnforcementEngine = ServiceLocator.getLiveLimitEnforcementEngine(
+            context = this,
+            scope = serviceScope,
+            onTriggerEmitted = { trigger ->
+                launchBlockingUi(trigger.packageName)
+            }
+        )
+        val existingCallback = liveEnforcementEngine.onTriggerEmitted
+        liveEnforcementEngine.onTriggerEmitted = { trigger ->
+            existingCallback?.invoke(trigger)
+            launchBlockingUi(trigger.packageName)
+        }
     }
 
     public override fun onServiceConnected() {
@@ -116,22 +130,8 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         safeLogD(TAG, "SERVICE_EVENT package=$eventPkg")
         enforcementTriggerRepository.recordEvent(eventPkg)
 
-        val trigger = detectionEngine.processEvent(
-            packageName = eventPkg,
-            eventType = event.eventType,
-            elapsedRealtimeMs = SystemClock.elapsedRealtime(),
-            triggerRepo = enforcementTriggerRepository
-        )
-
-        if (trigger != null) {
-            safeLogD(TAG, "TRIGGER_CREATED package=${trigger.packageName}")
-            enforcementTriggerRepository.emitTrigger(trigger)
-            launchBlockingUi(trigger.packageName)
-        } else {
-            if (!selectedAppsRepository.isSelected(eventPkg)) {
-                safeLogD(TAG, "NO_TRIGGER package=$eventPkg")
-            }
-        }
+        // Delegate foreground package transitions to LiveLimitEnforcementEngine (POC-05 & POC-05A)
+        liveEnforcementEngine.onForegroundPackageChanged(eventPkg)
     }
 
     private fun launchBlockingUi(packageName: String) {
@@ -157,15 +157,24 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_INTERRUPTED)
+        if (::liveEnforcementEngine.isInitialized) {
+            liveEnforcementEngine.stopMonitoring()
+        }
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_NOT_GRANTED)
+        if (::liveEnforcementEngine.isInitialized) {
+            liveEnforcementEngine.stopMonitoring()
+        }
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_NOT_GRANTED)
+        if (::liveEnforcementEngine.isInitialized) {
+            liveEnforcementEngine.stopMonitoring()
+        }
         serviceScope.cancel()
         super.onDestroy()
     }

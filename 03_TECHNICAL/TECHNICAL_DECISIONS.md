@@ -90,3 +90,27 @@ password/security credentials.\
 5. Explicitly avoids `SYSTEM_ALERT_WINDOW` overlays, screen node scraping, click automation, background timers, or device-admin API abuse.\
 **Reason:** Complies fully with Google Play policies regarding AccessibilityServices launching their own Activity from background when handling user accessibility events, while establishing a deterministic, verifiable blocking loop.
 
+### TD-012 --- Scoped Foreground Polling for Live Limit-Crossing Detection (POC-05A)
+
+
+**Status:** Approved (POC-05A)
+**Decision:**
+1. Introduce `LiveLimitEnforcementEngine` in `domain.detection` to manage lifecycle-safe continuous foreground monitoring for selected restricted apps.
+2. Architecture & Lifecycle rules:
+   - On `TYPE_WINDOW_STATE_CHANGED` event in `RestrictedAppAccessibilityService`:
+     - If the package is the Stop Doom Scroll self-package, cancel active monitoring immediately.
+     - If the package is unselected, cancel active monitoring immediately.
+     - If the package is already actively being monitored, ignore redundant events to prevent duplicate jobs.
+     - Perform an immediate evaluation against `UsageStatsRepository` and `UsageRuleEngine`. If already over limit, emit `EnforcementTrigger` and launch `BlockingScreen` immediately (preserving POC-05 entry blocking).
+     - If the app is within limit, start a scoped coroutine loop.
+3. Interval Determination: Set check interval to **5,000 ms (5 seconds)**.
+   - *Rationale*: A 5-second interval guarantees limit enforcement within 0–5 seconds of boundary crossing. With at most 12 lightweight IPC calls per minute strictly while inside a restricted app, battery overhead is negligible (<0.1% daily). Zero polling, zero wakeups, and zero background jobs run when the user is outside selected restricted apps or on the home screen.
+4. Single Source of Truth: `UsageStatsManager` remains the sole authoritative source of usage data, and `UsageRuleEngine` remains the single source of truth for limit evaluation. No secondary usage timer, countdown, or local counter is maintained.
+5. Immediate Cancellation: The monitoring coroutine job is cancelled immediately when:
+   - User switches to any other application (selected or unselected) or launcher.
+   - User navigates back to Stop Doom Scroll dashboard or blocking screen.
+   - AccessibilityService is interrupted (`onInterrupt`), unbound (`onUnbind`), or destroyed (`onDestroy`).
+   - Limit breach occurs and `EnforcementTrigger` is emitted.
+6. Thread Safety: All state transitions (`currentMonitoredPackage`, `monitoringJob`) are guarded by an internal synchronization lock, preventing race conditions during rapid app switching.
+**Reason:** Resolves physical device limitation where an in-use app exceeding its daily limit during continuous foreground usage would not be blocked until an explicit window state event occurred.
+
