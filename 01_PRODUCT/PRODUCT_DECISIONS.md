@@ -41,6 +41,12 @@ validation phase.\
 **Decision:** AccessibilityService is utilized strictly as a narrow, deterministic foreground-app entry detection trigger for the user's selected restricted apps, requiring explicit in-app prominent disclosure and affirmative consent.\
 **Reason:** Stop Doom Scroll is NOT an accessibility tool for users with disabilities. AccessibilityService is used only to extract `packageName` on `TYPE_WINDOW_STATE_CHANGED` events to evaluate `UsageRuleEngine` limit states, without inspecting screen content, text, passwords, or keystrokes.
 
+### PD-007 --- POC-05 Deterministic Blocking UI & Activity Enforcement Loop
+
+**Status:** Approved (POC-05)\
+**Decision:** When `RestrictedAppAccessibilityService` detects entry into a selected restricted package and `UsageRuleEngine` returns `LIMIT_REACHED`, `RestrictedAppAccessibilityService` emits an `EnforcementTrigger` and immediately launches Stop Doom Scroll's `BlockingScreen` (`MainActivity`) with `FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_SINGLE_TOP`. The blocking screen presents "Time's up", app label, today's usage, daily limit, and reset notice. Pressing Back safely retains the user within Stop Doom Scroll dashboard without exposing the restricted app.\
+**Reason:** Proves feasibility of real-time activity foreground blocking while adhering strictly to Google Play Accessibility policies and avoiding forbidden anti-patterns (e.g. `SYSTEM_ALERT_WINDOW` overlays, screen scraping, password modification, device admin abuse).
+
 ### Change Log
 
   Date         Change                       Reason
@@ -48,3 +54,4 @@ validation phase.\
   2026-09-24   Initial decisions recorded   Project baseline
   2026-09-28   Recorded PD-005              POC-03 Rules Engine feasibility
   2026-09-29   Recorded PD-006              POC-04 AccessibilityService narrow trigger
+  2026-10-08   Recorded PD-007              POC-05 Blocking UI & Enforcement Loop

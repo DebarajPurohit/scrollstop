@@ -43,4 +43,10 @@
     <string name="accessibility_status_not_granted">ACCESSIBILITY NOT GRANTED</string>
     <string name="accessibility_status_interrupted">ACCESSIBILITY INTERRUPTED</string>
     <string name="trigger_received_message">Enforcement Trigger Fired: %1$s (Limit Reached)</string>
+
+    <!-- Blocking UI Strings (POC-05) -->
+    <string name="blocking_screen_headline">Time\'s up</string>
+    <string name="blocking_screen_subtitle">You\'ve reached your daily limit for %1$s.</string>
+    <string name="blocking_screen_reset_info">Access will be available again after daily reset (midnight).</string>
+    <string name="btn_go_to_dashboard">Go to Dashboard</string>
 </resources>

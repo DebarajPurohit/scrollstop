@@ -126,10 +126,24 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         if (trigger != null) {
             safeLogD(TAG, "TRIGGER_CREATED package=${trigger.packageName}")
             enforcementTriggerRepository.emitTrigger(trigger)
+            launchBlockingUi(trigger.packageName)
         } else {
             if (!selectedAppsRepository.isSelected(eventPkg)) {
                 safeLogD(TAG, "NO_TRIGGER package=$eventPkg")
             }
+        }
+    }
+
+    private fun launchBlockingUi(packageName: String) {
+        try {
+            val intent = Intent(this, com.scrollstop.MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra(com.scrollstop.MainActivity.EXTRA_BLOCKED_PACKAGE, packageName)
+            }
+            startActivity(intent)
+            safeLogD(TAG, "BLOCKING_UI_LAUNCHED package=$packageName")
+        } catch (e: Throwable) {
+            safeLogD(TAG, "FAILED_TO_LAUNCH_BLOCKING_UI package=$packageName error=${e.message}")
         }
     }
 

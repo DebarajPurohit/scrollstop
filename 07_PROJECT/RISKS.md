@@ -41,6 +41,10 @@
               restart /                    `ACCESSIBILITY_NOT_GRANTED` state with user recovery
               kill after                   path                                             
               memory pressure                                                               
+
+  R-010       OEM background  High        Medium       Standard Activity start with `FLAG_ACTIVITY_NEW_TASK` Open (POC-05)
+              activity launch              works on AOSP/Samsung; document OEM popup permission
+              restrictions                 toggles (Xiaomi/Oppo) in testing matrix.
   -------------------------------------------------------------------------------------------------------------------------
 
 ## Risk Rule

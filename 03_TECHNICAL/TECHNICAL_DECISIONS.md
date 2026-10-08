@@ -78,3 +78,15 @@ password/security credentials.\
 2. In `RestrictedAppAccessibilityService`, set `AccessibilityServiceInfo.packageNames = null` so system_server unconditionally delivers `TYPE_WINDOW_STATE_CHANGED` events for all foreground app window changes. `RestrictedAppDetectionEngine` performs safe, instant O(1) package filtering in Kotlin without relying on fragile OS-level dynamic `setServiceInfo` package list mutation.
 3. Add minimal, privacy-compliant debug logging via `android.util.Log` tracing event receipt, package name, selection check, rule evaluation, trigger emission, and UI receipt without logging screen text, node info, passwords, or keystrokes.\
 **Reason:** Resolves physical device failure where dynamic `setServiceInfo` package list updates failed at the OS system_server level and in-memory trigger state was dropped when the app UI was backgrounded or process was recreated.
+
+### TD-011 --- Play-Compliant Activity Launching & Back Navigation Isolation for Blocking Loop
+
+**Status:** Approved (POC-05)\
+**Decision:**
+1. On `LIMIT_REACHED` event in `RestrictedAppAccessibilityService`, invoke `startActivity(Intent(this, MainActivity::class.java))` with flags `FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_CLEAR_TOP or FLAG_ACTIVITY_SINGLE_TOP` carrying `EXTRA_BLOCKED_PACKAGE`.
+2. `MainActivity` handles `onNewIntent` to pass the blocked package to `AppNavigation`, rendering `BlockingScreen`.
+3. `BlockingViewModel` loads empirical app label, today's usage, daily limit, and limit state directly from trusted repositories (`UsageStatsRepository`, `DailyLimitRepository`, `AppDiscoveryRepository`) and `UsageRuleEngine`.
+4. `BlockingScreen` attaches `BackHandler` so pressing Back navigates to Stop Doom Scroll dashboard (`Screen.Main`), preventing return to the restricted application.
+5. Explicitly avoids `SYSTEM_ALERT_WINDOW` overlays, screen node scraping, click automation, background timers, or device-admin API abuse.\
+**Reason:** Complies fully with Google Play policies regarding AccessibilityServices launching their own Activity from background when handling user accessibility events, while establishing a deterministic, verifiable blocking loop.
+
