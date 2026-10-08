@@ -31,7 +31,7 @@ class AccessibilityConsentViewModel(
         triggerRepository.latestTrigger
     ) { healthState, trigger ->
         if (trigger != null) {
-            Log.d("ScrollStopDebug", "AccessibilityConsentViewModel observed trigger received by UI for package: ${trigger.packageName}")
+            safeLogD("ScrollStopDebug", "AccessibilityConsentViewModel observed trigger received by UI for package: ${trigger.packageName}")
         }
         AccessibilityConsentUiState(
             serviceState = healthState,
@@ -42,6 +42,14 @@ class AccessibilityConsentViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = AccessibilityConsentUiState()
     )
+
+    private fun safeLogD(tag: String, message: String) {
+        try {
+            Log.d(tag, message)
+        } catch (e: Throwable) {
+            println("$tag: $message")
+        }
+    }
 
     fun checkServiceHealth(context: Context) {
         healthRepository.refreshState(context, RestrictedAppAccessibilityService::class.java)

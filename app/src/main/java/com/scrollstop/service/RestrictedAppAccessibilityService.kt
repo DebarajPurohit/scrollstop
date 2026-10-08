@@ -107,7 +107,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
         val eventPkg = event.packageName?.toString() ?: return
 
-        Log.d(TAG, "Service received TYPE_WINDOW_STATE_CHANGED event for package: $eventPkg")
+        safeLogD(TAG, "Service received TYPE_WINDOW_STATE_CHANGED event for package: $eventPkg")
 
         val trigger = detectionEngine.processEvent(
             packageName = eventPkg,
@@ -116,8 +116,16 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         )
 
         if (trigger != null) {
-            Log.d(TAG, "EnforcementTrigger emitted for package: ${trigger.packageName}")
+            safeLogD(TAG, "EnforcementTrigger emitted for package: ${trigger.packageName}")
             enforcementTriggerRepository.emitTrigger(trigger)
+        }
+    }
+
+    private fun safeLogD(tag: String, message: String) {
+        try {
+            Log.d(tag, message)
+        } catch (e: Throwable) {
+            println("$tag: $message")
         }
     }
 

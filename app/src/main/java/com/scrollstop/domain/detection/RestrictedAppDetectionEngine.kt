@@ -69,7 +69,7 @@ class RestrictedAppDetectionEngine(
         }
 
         val isSelected = selectedAppsRepository.isSelected(pkg)
-        Log.d(TAG, "DetectionEngine evaluating package: $pkg, selected: $isSelected")
+        safeLogD(TAG, "DetectionEngine evaluating package: $pkg, selected: $isSelected")
 
         // 4. Ignore unselected packages
         if (!isSelected) {
@@ -90,7 +90,7 @@ class RestrictedAppDetectionEngine(
             limitDurationMs = limitMs
         )
 
-        Log.d(TAG, "DetectionEngine evaluation for package: $pkg -> usedMs: $usedMs, limitMs: $limitMs, limitState: ${evaluation.limitState}")
+        safeLogD(TAG, "DetectionEngine evaluation for package: $pkg -> usedMs: $usedMs, limitMs: $limitMs, limitState: ${evaluation.limitState}")
 
         // 8. Emit trigger ONLY if limit state is LIMIT_REACHED
         return if (evaluation.limitState == LimitState.LIMIT_REACHED) {
@@ -101,6 +101,14 @@ class RestrictedAppDetectionEngine(
             )
         } else {
             null
+        }
+    }
+
+    private fun safeLogD(tag: String, message: String) {
+        try {
+            Log.d(tag, message)
+        } catch (e: Throwable) {
+            println("$tag: $message")
         }
     }
 }

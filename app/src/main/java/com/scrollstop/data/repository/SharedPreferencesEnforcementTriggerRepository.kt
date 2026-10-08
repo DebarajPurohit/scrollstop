@@ -72,7 +72,7 @@ class SharedPreferencesEnforcementTriggerRepository(
             .putLong(KEY_TIMESTAMP_MS, trigger.detectedAtElapsedRealtimeMs)
             .apply()
 
-        Log.d(TAG, "EnforcementTrigger emitted and persisted for package: ${trigger.packageName}")
+        safeLogD(TAG, "EnforcementTrigger emitted and persisted for package: ${trigger.packageName}")
 
         _latestTrigger.value = trigger
         _triggerFlow.tryEmit(trigger)
@@ -85,8 +85,16 @@ class SharedPreferencesEnforcementTriggerRepository(
             .remove(KEY_TIMESTAMP_MS)
             .apply()
 
-        Log.d(TAG, "EnforcementTrigger cleared from repository")
+        safeLogD(TAG, "EnforcementTrigger cleared from repository")
 
         _latestTrigger.value = null
+    }
+
+    private fun safeLogD(tag: String, message: String) {
+        try {
+            Log.d(tag, message)
+        } catch (e: Throwable) {
+            println("$tag: $message")
+        }
     }
 }
