@@ -16,9 +16,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
+import com.scrollstop.data.repository.DiagnosticInfo
+
 data class AccessibilityConsentUiState(
     val serviceState: AccessibilityServiceState = AccessibilityServiceState.ACCESSIBILITY_NOT_GRANTED,
-    val latestTrigger: EnforcementTrigger? = null
+    val latestTrigger: EnforcementTrigger? = null,
+    val diagnosticInfo: DiagnosticInfo = DiagnosticInfo()
 )
 
 class AccessibilityConsentViewModel(
@@ -28,14 +31,16 @@ class AccessibilityConsentViewModel(
 
     val uiState: StateFlow<AccessibilityConsentUiState> = combine(
         healthRepository.serviceState,
-        triggerRepository.latestTrigger
-    ) { healthState, trigger ->
+        triggerRepository.latestTrigger,
+        triggerRepository.diagnosticInfo
+    ) { healthState, trigger, diagnostic ->
         if (trigger != null) {
             safeLogD("ScrollStopDebug", "AccessibilityConsentViewModel observed trigger received by UI for package: ${trigger.packageName}")
         }
         AccessibilityConsentUiState(
             serviceState = healthState,
-            latestTrigger = trigger
+            latestTrigger = trigger,
+            diagnosticInfo = diagnostic
         )
     }.stateIn(
         scope = viewModelScope,

@@ -70,7 +70,13 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_ACTIVE)
 
+        safeLogD(TAG, "SERVICE_CONNECTED")
+
         updateServiceConfig()
+
+        val info = serviceInfo ?: currentConfigInfo
+        val packageNamesStr = if (info?.packageNames == null) "null" else info.packageNames.joinToString(",")
+        safeLogD(TAG, "SERVICE_CONFIG eventTypes=${info?.eventTypes} packageNames=$packageNamesStr canRetrieveWindowContent=${info?.canRetrieveWindowContent}")
 
         // Dynamically update service config when selected packages change
         serviceScope.launch {
@@ -107,17 +113,23 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
         val eventPkg = event.packageName?.toString() ?: return
 
-        safeLogD(TAG, "Service received TYPE_WINDOW_STATE_CHANGED event for package: $eventPkg")
+        safeLogD(TAG, "SERVICE_EVENT package=$eventPkg")
+        enforcementTriggerRepository.recordEvent(eventPkg)
 
         val trigger = detectionEngine.processEvent(
             packageName = eventPkg,
             eventType = event.eventType,
-            elapsedRealtimeMs = SystemClock.elapsedRealtime()
+            elapsedRealtimeMs = SystemClock.elapsedRealtime(),
+            triggerRepo = enforcementTriggerRepository
         )
 
         if (trigger != null) {
-            safeLogD(TAG, "EnforcementTrigger emitted for package: ${trigger.packageName}")
+            safeLogD(TAG, "TRIGGER_CREATED package=${trigger.packageName}")
             enforcementTriggerRepository.emitTrigger(trigger)
+        } else {
+            if (!selectedAppsRepository.isSelected(eventPkg)) {
+                safeLogD(TAG, "NO_TRIGGER package=$eventPkg")
+            }
         }
     }
 

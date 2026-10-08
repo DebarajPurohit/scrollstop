@@ -15,8 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * [SharedPreferences]-backed persistent implementation of [EnforcementTriggerRepository].
  *
- * Ensures emitted [EnforcementTrigger] state persists across background service events,
- * process restarts, activity backgrounding, and screen recreation.
+ * Ensures emitted [EnforcementTrigger] state and diagnostic event trace persist across
+ * background service events, process restarts, activity backgrounding, and screen recreation.
  */
 class SharedPreferencesEnforcementTriggerRepository(
     context: Context,
@@ -28,6 +28,15 @@ class SharedPreferencesEnforcementTriggerRepository(
         private const val KEY_PACKAGE_NAME = "trigger_package_name"
         private const val KEY_REASON = "trigger_reason"
         private const val KEY_TIMESTAMP_MS = "trigger_timestamp_ms"
+
+        private const val KEY_DIAG_EVENT_PKG = "diag_event_pkg"
+        private const val KEY_DIAG_DETECTION_PKG = "diag_detection_pkg"
+        private const val KEY_DIAG_DETECTION_SELECTED = "diag_detection_selected"
+        private const val KEY_DIAG_RULE_PKG = "diag_rule_pkg"
+        private const val KEY_DIAG_RULE_STATE = "diag_rule_state"
+        private const val KEY_DIAG_RULE_USED_MS = "diag_rule_used_ms"
+        private const val KEY_DIAG_RULE_LIMIT_MS = "diag_rule_limit_ms"
+
         private const val TAG = "ScrollStopDebug"
     }
 
@@ -36,8 +45,11 @@ class SharedPreferencesEnforcementTriggerRepository(
     private val _triggerFlow = MutableSharedFlow<EnforcementTrigger>(replay = 1)
     override val triggerFlow: SharedFlow<EnforcementTrigger> = _triggerFlow.asSharedFlow()
 
-    private val _latestTrigger = MutableStateFlow<EnforcementTrigger?>(readFromPrefs())
+    private val _latestTrigger = MutableStateFlow<EnforcementTrigger?>(readTriggerFromPrefs())
     override val latestTrigger: StateFlow<EnforcementTrigger?> = _latestTrigger.asStateFlow()
+
+    private val _diagnosticInfo = MutableStateFlow<DiagnosticInfo>(readDiagnosticFromPrefs())
+    override val diagnosticInfo: StateFlow<DiagnosticInfo> = _diagnosticInfo.asStateFlow()
 
     init {
         _latestTrigger.value?.let { trigger ->
@@ -45,7 +57,7 @@ class SharedPreferencesEnforcementTriggerRepository(
         }
     }
 
-    private fun readFromPrefs(): EnforcementTrigger? {
+    private fun readTriggerFromPrefs(): EnforcementTrigger? {
         val packageName = prefs.getString(KEY_PACKAGE_NAME, null) ?: return null
         if (packageName.isBlank()) return null
 
@@ -65,6 +77,33 @@ class SharedPreferencesEnforcementTriggerRepository(
         )
     }
 
+    private fun readDiagnosticFromPrefs(): DiagnosticInfo {
+        val eventPkg = prefs.getString(KEY_DIAG_EVENT_PKG, null)
+        val detectionPkg = prefs.getString(KEY_DIAG_DETECTION_PKG, null)
+        val detectionSelected = if (prefs.contains(KEY_DIAG_DETECTION_SELECTED)) {
+            prefs.getBoolean(KEY_DIAG_DETECTION_SELECTED, false)
+        } else null
+
+        val rulePkg = prefs.getString(KEY_DIAG_RULE_PKG, null)
+        val ruleStateStr = prefs.getString(KEY_DIAG_RULE_STATE, null)
+        val ruleState = if (ruleStateStr != null) {
+            try { LimitState.valueOf(ruleStateStr) } catch (e: Exception) { null }
+        } else null
+
+        val usedMs = prefs.getLong(KEY_DIAG_RULE_USED_MS, 0L)
+        val limitMs = prefs.getLong(KEY_DIAG_RULE_LIMIT_MS, 0L)
+
+        return DiagnosticInfo(
+            lastEventPackage = eventPkg,
+            lastDetectionPackage = detectionPkg,
+            lastDetectionSelected = detectionSelected,
+            lastRulePackage = rulePkg,
+            lastRuleState = ruleState,
+            lastRuleUsedMs = usedMs,
+            lastRuleLimitMs = limitMs
+        )
+    }
+
     override fun emitTrigger(trigger: EnforcementTrigger) {
         prefs.edit()
             .putString(KEY_PACKAGE_NAME, trigger.packageName)
@@ -72,7 +111,7 @@ class SharedPreferencesEnforcementTriggerRepository(
             .putLong(KEY_TIMESTAMP_MS, trigger.detectedAtElapsedRealtimeMs)
             .apply()
 
-        safeLogD(TAG, "EnforcementTrigger emitted and persisted for package: ${trigger.packageName}")
+        safeLogD(TAG, "TRIGGER_PERSISTED package=${trigger.packageName}")
 
         _latestTrigger.value = trigger
         _triggerFlow.tryEmit(trigger)
@@ -85,9 +124,41 @@ class SharedPreferencesEnforcementTriggerRepository(
             .remove(KEY_TIMESTAMP_MS)
             .apply()
 
-        safeLogD(TAG, "EnforcementTrigger cleared from repository")
+        safeLogD(TAG, "TRIGGER_CLEARED")
 
         _latestTrigger.value = null
+    }
+
+    override fun recordEvent(packageName: String) {
+        prefs.edit().putString(KEY_DIAG_EVENT_PKG, packageName).apply()
+        _diagnosticInfo.value = _diagnosticInfo.value.copy(lastEventPackage = packageName)
+    }
+
+    override fun recordDetection(packageName: String, isSelected: Boolean) {
+        prefs.edit()
+            .putString(KEY_DIAG_DETECTION_PKG, packageName)
+            .putBoolean(KEY_DIAG_DETECTION_SELECTED, isSelected)
+            .apply()
+        _diagnosticInfo.value = _diagnosticInfo.value.copy(
+            lastDetectionPackage = packageName,
+            lastDetectionSelected = isSelected
+        )
+    }
+
+    override fun recordRuleEvaluation(packageName: String, usedMs: Long, limitMs: Long, state: LimitState) {
+        prefs.edit()
+            .putString(KEY_DIAG_RULE_PKG, packageName)
+            .putString(KEY_DIAG_RULE_STATE, state.name)
+            .putLong(KEY_DIAG_RULE_USED_MS, usedMs)
+            .putLong(KEY_DIAG_RULE_LIMIT_MS, limitMs)
+            .apply()
+
+        _diagnosticInfo.value = _diagnosticInfo.value.copy(
+            lastRulePackage = packageName,
+            lastRuleState = state,
+            lastRuleUsedMs = usedMs,
+            lastRuleLimitMs = limitMs
+        )
     }
 
     private fun safeLogD(tag: String, message: String) {

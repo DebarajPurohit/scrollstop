@@ -215,6 +215,56 @@ fun AccessibilityConsentScreen(
                         }
                     }
                 }
+
+                // Development Diagnostic Panel (POC-04 Event Chain Debug)
+                Spacer(modifier = Modifier.height(24.dp))
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            contentDescription = "Development Diagnostic Panel"
+                        },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "DEV DIAGNOSTICS (POC-04 EVENT TRACE)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Accessibility Service: ${uiState.serviceState}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "Last Event Package: ${uiState.diagnosticInfo.lastEventPackage ?: "None"}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "Last Detection: ${uiState.diagnosticInfo.lastDetectionPackage ?: "None"} (selected = ${uiState.diagnosticInfo.lastDetectionSelected ?: "N/A"})",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "Last Rule Evaluation: ${uiState.diagnosticInfo.lastRulePackage ?: "None"} (${uiState.diagnosticInfo.lastRuleState ?: "N/A"})",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "Last Enforcement Trigger: ${uiState.latestTrigger?.packageName ?: "None"} (${uiState.latestTrigger?.reason ?: "No Trigger"})",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (uiState.latestTrigger != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
     }

@@ -49,7 +49,8 @@ class RestrictedAppDetectionEngine(
     fun processEvent(
         packageName: String?,
         eventType: Int,
-        elapsedRealtimeMs: Long = 0L
+        elapsedRealtimeMs: Long = 0L,
+        triggerRepo: com.scrollstop.data.repository.EnforcementTriggerRepository? = null
     ): EnforcementTrigger? {
         // 1. Ignore events that are not TYPE_WINDOW_STATE_CHANGED
         if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -69,7 +70,8 @@ class RestrictedAppDetectionEngine(
         }
 
         val isSelected = selectedAppsRepository.isSelected(pkg)
-        safeLogD(TAG, "DetectionEngine evaluating package: $pkg, selected: $isSelected")
+        safeLogD(TAG, "DETECTION package=$pkg selected=$isSelected")
+        triggerRepo?.recordDetection(pkg, isSelected)
 
         // 4. Ignore unselected packages
         if (!isSelected) {
@@ -90,7 +92,8 @@ class RestrictedAppDetectionEngine(
             limitDurationMs = limitMs
         )
 
-        safeLogD(TAG, "DetectionEngine evaluation for package: $pkg -> usedMs: $usedMs, limitMs: $limitMs, limitState: ${evaluation.limitState}")
+        safeLogD(TAG, "RULE package=$pkg usedMs=$usedMs limitMs=$limitMs state=${evaluation.limitState}")
+        triggerRepo?.recordRuleEvaluation(pkg, usedMs, limitMs, evaluation.limitState)
 
         // 8. Emit trigger ONLY if limit state is LIMIT_REACHED
         return if (evaluation.limitState == LimitState.LIMIT_REACHED) {

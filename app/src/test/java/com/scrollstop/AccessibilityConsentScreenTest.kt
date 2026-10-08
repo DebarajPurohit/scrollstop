@@ -1,25 +1,25 @@
 package com.scrollstop
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.scrollstop.domain.model.AccessibilityServiceState
 import com.scrollstop.domain.model.EnforcementTrigger
 import com.scrollstop.domain.rules.LimitState
 import com.scrollstop.ui.screens.accessibility.AccessibilityConsentScreen
 import com.scrollstop.ui.screens.accessibility.AccessibilityConsentUiState
-import com.scrollstop.ui.theme.StopDoomScrollTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
+@RunWith(AndroidJUnit4::class)
 @Config(sdk = [34])
 class AccessibilityConsentScreenTest {
 
@@ -37,7 +37,7 @@ class AccessibilityConsentScreenTest {
         )
 
         composeTestRule.setContent {
-            StopDoomScrollTheme {
+            MaterialTheme {
                 AccessibilityConsentScreen(
                     uiState = state,
                     onGrantConsent = { grantClicked = true },
@@ -75,7 +75,7 @@ class AccessibilityConsentScreenTest {
         )
 
         composeTestRule.setContent {
-            StopDoomScrollTheme {
+            MaterialTheme {
                 AccessibilityConsentScreen(
                     uiState = state,
                     onGrantConsent = {},

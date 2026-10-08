@@ -56,10 +56,6 @@ class AndroidAccessibilityServiceHealthRepository : AccessibilityServiceHealthRe
     }
 
     override fun refreshState(context: Context, serviceClass: Class<*>) {
-        if (_serviceState.value == AccessibilityServiceState.ACCESSIBILITY_ACTIVE) {
-            // Keep active state if service is currently bound and active
-            return
-        }
         val isEnabled = isServiceEnabledInSettings(context, serviceClass)
         _serviceState.value = if (isEnabled) {
             AccessibilityServiceState.ACCESSIBILITY_ACTIVE
