@@ -42,8 +42,8 @@ fun AppNavigation() {
     val usageStatsRepository = remember(context) {
         ServiceLocator.getUsageStatsRepository(context)
     }
-    val enforcementTriggerRepository = remember {
-        ServiceLocator.getEnforcementTriggerRepository()
+    val enforcementTriggerRepository = remember(context) {
+        ServiceLocator.getEnforcementTriggerRepository(context)
     }
     val healthRepository = remember {
         ServiceLocator.getAccessibilityHealthRepository()

@@ -3,9 +3,14 @@ package com.scrollstop
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.scrollstop.data.repository.SharedPreferencesDailyLimitRepository
+import com.scrollstop.data.repository.SharedPreferencesEnforcementTriggerRepository
 import com.scrollstop.data.repository.SharedPreferencesSelectedAppsRepository
+import com.scrollstop.domain.model.EnforcementTrigger
+import com.scrollstop.domain.rules.LimitState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -60,5 +65,41 @@ class SharedPreferencesRepositoriesTest {
         // Reload from prefs
         val reloadedRepo = SharedPreferencesDailyLimitRepository(context, defaultLimitMs = 120_000L, prefName = "test_daily_limits")
         assertEquals(300_000L, reloadedRepo.getLimitForPackage("com.google.android.youtube"))
+    }
+
+    @Test
+    fun `test persistent enforcement trigger repository emits, persists and clears trigger`() {
+        val repo = SharedPreferencesEnforcementTriggerRepository(context, prefName = "test_trigger_prefs")
+
+        assertNull(repo.latestTrigger.value)
+
+        val trigger = EnforcementTrigger(
+            packageName = "com.google.android.youtube",
+            reason = LimitState.LIMIT_REACHED,
+            detectedAtElapsedRealtimeMs = 12345L
+        )
+
+        repo.emitTrigger(trigger)
+
+        val current = repo.latestTrigger.value
+        assertNotNull(current)
+        assertEquals("com.google.android.youtube", current?.packageName)
+        assertEquals(LimitState.LIMIT_REACHED, current?.reason)
+        assertEquals(12345L, current?.detectedAtElapsedRealtimeMs)
+
+        // Reload from prefs (simulating process restart)
+        val reloadedRepo = SharedPreferencesEnforcementTriggerRepository(context, prefName = "test_trigger_prefs")
+        val restored = reloadedRepo.latestTrigger.value
+        assertNotNull(restored)
+        assertEquals("com.google.android.youtube", restored?.packageName)
+        assertEquals(LimitState.LIMIT_REACHED, restored?.reason)
+        assertEquals(12345L, restored?.detectedAtElapsedRealtimeMs)
+
+        // Clear trigger
+        reloadedRepo.clearLatestTrigger()
+        assertNull(reloadedRepo.latestTrigger.value)
+
+        val clearedReloaded = SharedPreferencesEnforcementTriggerRepository(context, prefName = "test_trigger_prefs")
+        assertNull(clearedReloaded.latestTrigger.value)
     }
 }

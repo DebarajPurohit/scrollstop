@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.os.SystemClock
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.scrollstop.data.di.ServiceLocator
 import com.scrollstop.data.repository.AccessibilityServiceHealthRepository
@@ -34,6 +35,10 @@ import kotlinx.coroutines.launch
  */
 class RestrictedAppAccessibilityService : AccessibilityService() {
 
+    companion object {
+        private const val TAG = "ScrollStopDebug"
+    }
+
     private lateinit var selectedAppsRepository: SelectedAppsRepository
     private lateinit var dailyLimitRepository: DailyLimitRepository
     private lateinit var usageStatsRepository: UsageStatsRepository
@@ -48,7 +53,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         selectedAppsRepository = ServiceLocator.getSelectedAppsRepository(this)
         dailyLimitRepository = ServiceLocator.getDailyLimitRepository(this)
         usageStatsRepository = ServiceLocator.getUsageStatsRepository(this)
-        enforcementTriggerRepository = ServiceLocator.getEnforcementTriggerRepository()
+        enforcementTriggerRepository = ServiceLocator.getEnforcementTriggerRepository(this)
         healthRepository = ServiceLocator.getAccessibilityHealthRepository()
         val ruleEngine = ServiceLocator.getUsageRuleEngine()
 
@@ -65,12 +70,12 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_ACTIVE)
 
-        updateServiceConfig(selectedAppsRepository.getSelectedPackages())
+        updateServiceConfig()
 
-        // Dynamically update package filtering when selected packages change
+        // Dynamically update service config when selected packages change
         serviceScope.launch {
-            selectedAppsRepository.selectedPackageNames.collectLatest { selectedSet ->
-                updateServiceConfig(selectedSet)
+            selectedAppsRepository.selectedPackageNames.collectLatest {
+                updateServiceConfig()
             }
         }
     }
@@ -78,7 +83,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
     var currentConfigInfo: AccessibilityServiceInfo? = null
         private set
 
-    private fun updateServiceConfig(selectedPackages: Set<String>) {
+    private fun updateServiceConfig() {
         val info = serviceInfo ?: currentConfigInfo ?: AccessibilityServiceInfo()
         info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
@@ -87,13 +92,9 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
         // Window content inspection is prohibited by accessibility_service_config.xml (android:canRetrieveWindowContent="false")
 
-        // Narrow package filtering where practical
-        if (selectedPackages.isNotEmpty()) {
-            info.packageNames = selectedPackages.toTypedArray()
-        } else {
-            // Placeholder array when no apps are selected to prevent subscribing to all system apps
-            info.packageNames = arrayOf("com.scrollstop.dummy_filter_placeholder")
-        }
+        // Setting info.packageNames to null guarantees window state events are delivered from system_server.
+        // RestrictedAppDetectionEngine performs safe, instant O(1) package filtering in code without relying on OS setServiceInfo dynamic mutation.
+        info.packageNames = null
 
         currentConfigInfo = info
         setServiceInfo(info)
@@ -106,6 +107,8 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
         val eventPkg = event.packageName?.toString() ?: return
 
+        Log.d(TAG, "Service received TYPE_WINDOW_STATE_CHANGED event for package: $eventPkg")
+
         val trigger = detectionEngine.processEvent(
             packageName = eventPkg,
             eventType = event.eventType,
@@ -113,6 +116,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         )
 
         if (trigger != null) {
+            Log.d(TAG, "EnforcementTrigger emitted for package: ${trigger.packageName}")
             enforcementTriggerRepository.emitTrigger(trigger)
         }
     }

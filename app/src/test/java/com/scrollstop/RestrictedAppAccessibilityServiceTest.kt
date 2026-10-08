@@ -60,15 +60,14 @@ class RestrictedAppAccessibilityServiceTest {
     }
 
     @Test
-    fun `test 14 - service configuration subscribes only to TYPE_WINDOW_STATE_CHANGED and dynamic package filter`() {
+    fun `test 14 - service configuration subscribes to TYPE_WINDOW_STATE_CHANGED with null packageNames filter for system event delivery`() {
         selectedAppsRepository.setSelectedPackages(setOf("com.google.android.youtube"))
         service.onServiceConnected()
 
         val info = service.currentConfigInfo ?: service.serviceInfo
         assertNotNull(info)
         assertEquals(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED, info?.eventTypes)
-        assertNotNull(info?.packageNames)
-        assertEquals("com.google.android.youtube", info?.packageNames?.firstOrNull())
+        assertNull("packageNames must be null to guarantee system event delivery across all Android OS versions", info?.packageNames)
     }
 
     @Test

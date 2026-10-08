@@ -1,5 +1,6 @@
 package com.scrollstop.domain.detection
 
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.scrollstop.data.repository.DailyLimitRepository
 import com.scrollstop.data.repository.SelectedAppsRepository
@@ -34,6 +35,7 @@ class RestrictedAppDetectionEngine(
 ) {
     companion object {
         const val DEFAULT_SELF_PACKAGE = "com.scrollstop"
+        private const val TAG = "ScrollStopDebug"
     }
 
     /**
@@ -66,8 +68,11 @@ class RestrictedAppDetectionEngine(
             return null
         }
 
+        val isSelected = selectedAppsRepository.isSelected(pkg)
+        Log.d(TAG, "DetectionEngine evaluating package: $pkg, selected: $isSelected")
+
         // 4. Ignore unselected packages
-        if (!selectedAppsRepository.isSelected(pkg)) {
+        if (!isSelected) {
             return null
         }
 
@@ -84,6 +89,8 @@ class RestrictedAppDetectionEngine(
             usedDurationMs = usedMs,
             limitDurationMs = limitMs
         )
+
+        Log.d(TAG, "DetectionEngine evaluation for package: $pkg -> usedMs: $usedMs, limitMs: $limitMs, limitState: ${evaluation.limitState}")
 
         // 8. Emit trigger ONLY if limit state is LIMIT_REACHED
         return if (evaluation.limitState == LimitState.LIMIT_REACHED) {

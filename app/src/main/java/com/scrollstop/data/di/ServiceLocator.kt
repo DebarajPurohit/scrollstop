@@ -9,6 +9,7 @@ import com.scrollstop.data.repository.EnforcementTriggerRepository
 import com.scrollstop.data.repository.InMemoryEnforcementTriggerRepository
 import com.scrollstop.data.repository.SelectedAppsRepository
 import com.scrollstop.data.repository.SharedPreferencesDailyLimitRepository
+import com.scrollstop.data.repository.SharedPreferencesEnforcementTriggerRepository
 import com.scrollstop.data.repository.SharedPreferencesSelectedAppsRepository
 import com.scrollstop.data.repository.UsageStatsRepository
 import com.scrollstop.domain.rules.UsageRuleEngine
@@ -59,10 +60,16 @@ object ServiceLocator {
         }
     }
 
-    fun getEnforcementTriggerRepository(): EnforcementTriggerRepository {
+    fun getEnforcementTriggerRepository(context: Context? = null): EnforcementTriggerRepository {
         return enforcementTriggerRepository ?: synchronized(this) {
-            enforcementTriggerRepository ?: InMemoryEnforcementTriggerRepository().also {
-                enforcementTriggerRepository = it
+            enforcementTriggerRepository ?: if (context != null) {
+                SharedPreferencesEnforcementTriggerRepository(context.applicationContext).also {
+                    enforcementTriggerRepository = it
+                }
+            } else {
+                InMemoryEnforcementTriggerRepository().also {
+                    enforcementTriggerRepository = it
+                }
             }
         }
     }

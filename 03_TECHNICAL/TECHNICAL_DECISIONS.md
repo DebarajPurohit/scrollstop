@@ -69,3 +69,12 @@ password/security credentials.\
 4. Dynamically update package filtering in `setServiceInfo(...)` based on selected packages flow.
 5. Provide `AccessibilityServiceHealthRepository` to observe service states (`ACCESSIBILITY_NOT_GRANTED`, `ACCESSIBILITY_ACTIVE`, `ACCESSIBILITY_INTERRUPTED`).\
 **Reason:** Strict privacy and Play Store compliance. Does NOT inspect window text, view hierarchy, messages, passwords, or keystrokes. Does NOT run background loops or duplicate usage timing.
+
+### TD-010B --- Persistent EnforcementTriggerRepository & System-Level Accessibility Event Delivery Fix (POC-04 Debug)
+
+**Status:** Approved (POC-04 Debug)\
+**Decision:**
+1. Replace `InMemoryEnforcementTriggerRepository` with `SharedPreferencesEnforcementTriggerRepository` so emitted `EnforcementTrigger` state persists across Android Activity lifecycles, backgrounding, UI recreation, and process restarts.
+2. In `RestrictedAppAccessibilityService`, set `AccessibilityServiceInfo.packageNames = null` so system_server unconditionally delivers `TYPE_WINDOW_STATE_CHANGED` events for all foreground app window changes. `RestrictedAppDetectionEngine` performs safe, instant O(1) package filtering in Kotlin without relying on fragile OS-level dynamic `setServiceInfo` package list mutation.
+3. Add minimal, privacy-compliant debug logging via `android.util.Log` tracing event receipt, package name, selection check, rule evaluation, trigger emission, and UI receipt without logging screen text, node info, passwords, or keystrokes.\
+**Reason:** Resolves physical device failure where dynamic `setServiceInfo` package list updates failed at the OS system_server level and in-memory trigger state was dropped when the app UI was backgrounded or process was recreated.

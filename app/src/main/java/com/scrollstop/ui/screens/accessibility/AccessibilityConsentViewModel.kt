@@ -3,6 +3,7 @@ package com.scrollstop.ui.screens.accessibility
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scrollstop.data.repository.AccessibilityServiceHealthRepository
@@ -29,6 +30,9 @@ class AccessibilityConsentViewModel(
         healthRepository.serviceState,
         triggerRepository.latestTrigger
     ) { healthState, trigger ->
+        if (trigger != null) {
+            Log.d("ScrollStopDebug", "AccessibilityConsentViewModel observed trigger received by UI for package: ${trigger.packageName}")
+        }
         AccessibilityConsentUiState(
             serviceState = healthState,
             latestTrigger = trigger
