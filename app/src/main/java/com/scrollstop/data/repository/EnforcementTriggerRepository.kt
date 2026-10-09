@@ -19,7 +19,17 @@ data class DiagnosticInfo(
     val lastRulePackage: String? = null,
     val lastRuleState: LimitState? = null,
     val lastRuleUsedMs: Long = 0L,
-    val lastRuleLimitMs: Long = 0L
+    val lastRuleLimitMs: Long = 0L,
+    // Phase 3 Live Monitoring Cycle Diagnostics
+    val lastMonitoringTimestamp: Long = 0L,
+    val lastMonitoringPackage: String? = null,
+    val lastMonitoringSelected: Boolean? = null,
+    val lastMonitoringActive: Boolean = false,
+    val lastMonitoringUsageMs: Long = 0L,
+    val lastMonitoringLimitMs: Long = 0L,
+    val lastMonitoringRuleState: LimitState? = null,
+    val lastMonitoringTriggerEmitted: Boolean = false,
+    val lastMonitoringLaunchAttempted: Boolean = false
 )
 
 /**
@@ -37,6 +47,17 @@ interface EnforcementTriggerRepository {
     fun recordEvent(packageName: String)
     fun recordDetection(packageName: String, isSelected: Boolean)
     fun recordRuleEvaluation(packageName: String, usedMs: Long, limitMs: Long, state: LimitState)
+    fun recordMonitoringCycle(
+        timestamp: Long,
+        packageName: String,
+        isSelected: Boolean,
+        isMonitoringActive: Boolean,
+        currentUsageMs: Long,
+        configuredLimitMs: Long,
+        ruleResult: LimitState,
+        triggerEmitted: Boolean,
+        launchAttempted: Boolean
+    )
 }
 
 /**
@@ -79,6 +100,30 @@ class InMemoryEnforcementTriggerRepository : EnforcementTriggerRepository {
             lastRuleUsedMs = usedMs,
             lastRuleLimitMs = limitMs,
             lastRuleState = state
+        )
+    }
+
+    override fun recordMonitoringCycle(
+        timestamp: Long,
+        packageName: String,
+        isSelected: Boolean,
+        isMonitoringActive: Boolean,
+        currentUsageMs: Long,
+        configuredLimitMs: Long,
+        ruleResult: LimitState,
+        triggerEmitted: Boolean,
+        launchAttempted: Boolean
+    ) {
+        _diagnosticInfo.value = _diagnosticInfo.value.copy(
+            lastMonitoringTimestamp = timestamp,
+            lastMonitoringPackage = packageName,
+            lastMonitoringSelected = isSelected,
+            lastMonitoringActive = isMonitoringActive,
+            lastMonitoringUsageMs = currentUsageMs,
+            lastMonitoringLimitMs = configuredLimitMs,
+            lastMonitoringRuleState = ruleResult,
+            lastMonitoringTriggerEmitted = triggerEmitted,
+            lastMonitoringLaunchAttempted = launchAttempted
         )
     }
 }

@@ -92,7 +92,6 @@ password/security credentials.\
 
 ### TD-012 --- Scoped Foreground Polling for Live Limit-Crossing Detection (POC-05A)
 
-
 **Status:** Approved (POC-05A)
 **Decision:**
 1. Introduce `LiveLimitEnforcementEngine` in `domain.detection` to manage lifecycle-safe continuous foreground monitoring for selected restricted apps.
@@ -113,4 +112,22 @@ password/security credentials.\
    - Limit breach occurs and `EnforcementTrigger` is emitted.
 6. Thread Safety: All state transitions (`currentMonitoredPackage`, `monitoringJob`) are guarded by an internal synchronization lock, preventing race conditions during rapid app switching.
 **Reason:** Resolves physical device limitation where an in-use app exceeding its daily limit during continuous foreground usage would not be blocked until an explicit window state event occurred.
+
+### TD-013 --- UsageStats Freshness via UsageEvents & Transient Window Isolation (POC-06 Fix)
+
+**Status:** Approved (POC-06 Investigation & Fix)
+**Decision:**
+1. Authoritative Usage Freshness: `AndroidUsageStatsRepository` combines `UsageStatsManager.queryAndAggregateUsageStats(startTime, endTime)` with session-accurate interval reconstruction using `UsageStatsManager.queryEvents(startTime, endTime)`.
+   - *Rationale*: Android's `UsageStatsDatabase` buffers usage events and only commits `totalTimeInForeground` when an application moves to the background or during periodic OS sync intervals (15–30+ minutes). For an application used continuously in the foreground starting at 0 usage (such as Amazon in POC-06 testing), `queryAndAggregateUsageStats` returns 0 ms until the app is closed.
+   - *Fix*: Reconstruct active foreground sessions from `UsageEvents.Event.ACTIVITY_RESUMED` / `ACTIVITY_PAUSED` / `ACTIVITY_STOPPED`, tracking active activity sets per package to handle multi-activity transitions safely without premature session termination. The repository yields `maxOf(aggregatedMs, eventsCalculatedMs)`, ensuring `UsageStatsManager` remains the single authoritative source of truth with sub-second accuracy for ongoing foreground sessions.
+2. Transient System & IME Window Isolation:
+   - While `LiveLimitEnforcementEngine` is actively monitoring a foreground restricted application, window state events originating from transient system overlays (`"android"`, `"com.android.systemui"`) and active input methods (IMEs / soft keyboards such as Gboard, Samsung Keyboard) are recognized as transient windows.
+   - The engine ignores transient system/IME events without cancelling the active monitoring coroutine, preserving continuous enforcement when users type in search bars or system UI elements appear.
+   - Switching to the home screen launcher or any unselected third-party application cancels active monitoring immediately.
+3. Service Lifecycle & Scope Synchronization:
+   - `ServiceLocator.getLiveLimitEnforcementEngine` validates coroutine scope activity (`scope.isActive`), recreating the engine with a fresh, active scope if the previous service instance was destroyed.
+   - `RestrictedAppAccessibilityService.onDestroy()` explicitly invokes `ServiceLocator.resetLiveLimitEnforcementEngine()`.
+4. Dev Diagnostics Enhancement:
+   - Persist and display timestamped monitoring cycle fields (`lastMonitoringTimestamp`, `lastMonitoringPackage`, `lastMonitoringActive`, `lastMonitoringUsageMs`, `lastMonitoringLimitMs`, `lastMonitoringRuleState`, `lastMonitoringTriggerEmitted`, `lastMonitoringLaunchAttempted`) in `SharedPreferencesEnforcementTriggerRepository` and on the Dev Diagnostic card.
+**Reason:** Eliminates live enforcement failure on physical hardware where continuous usage of a 0-usage app failed to trigger live limit crossing due to Android OS aggregation buffering and transient window cancellations.
 

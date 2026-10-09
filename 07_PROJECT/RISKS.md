@@ -17,10 +17,10 @@
               visibility                   manifest declaration                             
               constraints                                                                   
 
-  R-004       UsageStats      High        Low          UsageStatsManager is single source of usage;     Mitigated (POC-03/04)
-              timing vs                    AccessibilityService is ONLY the foreground app  
-              enforcement                  detection trigger (no duplicate counters)        
-              trigger                                                                       
+  R-004       UsageStats      High        Low          UsageStatsManager is single source of usage;     Mitigated (POC-03/04/06)
+              timing vs                                AccessibilityService is foreground detection;    
+              enforcement                              UsageEvents reconstructs live ongoing intervals  
+              trigger                                  without OS buffer lag (TD-013)                   
 
   R-005       Play policy     High        Medium       Explicit in-app prominent disclosure screen,     Open
               requirements                 no claim as accessibility tool (`isAccessibilityTool="false"`),
@@ -34,7 +34,7 @@
               sensitive                    guarantee (no screen/text/password collection)   
               permissions                                                                   
 
-  R-008       Blocking        Critical    Medium       Treat as release-blocking issue; physical device Open
+  R-008       Blocking        Critical    Medium       Treat as release-blocking issue; physical device Open (Active POC-06)
               failures                     testing                                          
 
   R-009       OEM service     High        Medium       Detect service unbind/destroy and transition to   Open (POC-04)
@@ -45,6 +45,10 @@
   R-010       OEM background  High        Medium       Standard Activity start with `FLAG_ACTIVITY_NEW_TASK` Open (POC-05)
               activity launch              works on AOSP/Samsung; document OEM popup permission
               restrictions                 toggles (Xiaomi/Oppo) in testing matrix.
+
+  R-011       Transient window High       Low          Ignore 'android', 'com.android.systemui',        Mitigated (POC-06)
+              interrupts live                          and enabled IMEs during active monitoring       
+              monitoring                               without cancelling loop (TD-013)                 
   -------------------------------------------------------------------------------------------------------------------------
 
 ## Risk Rule

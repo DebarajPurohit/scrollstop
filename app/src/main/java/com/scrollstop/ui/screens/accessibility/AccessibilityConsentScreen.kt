@@ -254,6 +254,10 @@ fun AccessibilityConsentScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
+                            text = "Last Monitoring Cycle: ${uiState.diagnosticInfo.lastMonitoringPackage ?: "None"} (active=${uiState.diagnosticInfo.lastMonitoringActive}, used=${uiState.diagnosticInfo.lastMonitoringUsageMs / 1000}s, limit=${uiState.diagnosticInfo.lastMonitoringLimitMs / 1000}s, state=${uiState.diagnosticInfo.lastMonitoringRuleState ?: "N/A"})",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
                             text = "Last Rule Evaluation: ${uiState.diagnosticInfo.lastRulePackage ?: "None"} (${uiState.diagnosticInfo.lastRuleState ?: "N/A"})",
                             style = MaterialTheme.typography.bodySmall
                         )

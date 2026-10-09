@@ -41,6 +41,10 @@ class LiveLimitEnforcementEngine(
     private val scope: CoroutineScope,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val timeProvider: () -> Long = { SystemClock.elapsedRealtime() },
+    private val isTransientPackage: (String) -> Boolean = { pkg ->
+        pkg.equals("android", ignoreCase = true) ||
+        pkg.equals("com.android.systemui", ignoreCase = true)
+    },
     var onTriggerEmitted: ((EnforcementTrigger) -> Unit)? = null
 ) {
     companion object {
@@ -87,6 +91,14 @@ class LiveLimitEnforcementEngine(
                 return
             }
 
+            // If an active restricted app is currently being monitored, check if the incoming window
+            // event belongs to a transient system overlay or keyboard (IME). If so, ignore the transient
+            // window without stopping the continuous monitor for the active app.
+            if (currentMonitoredPackage != null && isTransientPackage(pkg)) {
+                safeLogD(TAG, "LIVE_MONITOR_TRANSIENT_SYSTEM_EVENT pkg=$pkg activeMonitor=$currentMonitoredPackage")
+                return
+            }
+
             val isSelected = selectedAppsRepository.isSelected(pkg)
             enforcementTriggerRepository.recordDetection(pkg, isSelected)
 
@@ -111,15 +123,28 @@ class LiveLimitEnforcementEngine(
             val usedMs = usageResult.getOrNull()?.get(pkg) ?: 0L
             val limitMs = dailyLimitRepository.getLimitForPackage(pkg)
             val evaluation = usageRuleEngine.evaluate(pkg, usedMs, limitMs)
+            val willTrigger = evaluation.limitState == LimitState.LIMIT_REACHED
+            val timestamp = timeProvider()
 
-            safeLogD(TAG, "LIVE_INITIAL_EVAL package=$pkg usedMs=$usedMs limitMs=$limitMs state=${evaluation.limitState}")
+            safeLogD(TAG, "LIVE_INITIAL_EVAL time=$timestamp package=$pkg usedMs=$usedMs limitMs=$limitMs state=${evaluation.limitState} trigger=$willTrigger")
             enforcementTriggerRepository.recordRuleEvaluation(pkg, usedMs, limitMs, evaluation.limitState)
+            enforcementTriggerRepository.recordMonitoringCycle(
+                timestamp = timestamp,
+                packageName = pkg,
+                isSelected = true,
+                isMonitoringActive = !willTrigger,
+                currentUsageMs = usedMs,
+                configuredLimitMs = limitMs,
+                ruleResult = evaluation.limitState,
+                triggerEmitted = willTrigger,
+                launchAttempted = willTrigger
+            )
 
-            if (evaluation.limitState == LimitState.LIMIT_REACHED) {
+            if (willTrigger) {
                 val trigger = EnforcementTrigger(
                     packageName = pkg,
                     reason = LimitState.LIMIT_REACHED,
-                    detectedAtElapsedRealtimeMs = timeProvider()
+                    detectedAtElapsedRealtimeMs = timestamp
                 )
                 safeLogD(TAG, "IMMEDIATE_LIMIT_REACHED package=$pkg")
                 enforcementTriggerRepository.emitTrigger(trigger)
@@ -158,15 +183,28 @@ class LiveLimitEnforcementEngine(
                     val currentUsageMs = usageResult.getOrNull()?.get(pkg) ?: 0L
                     val currentLimitMs = dailyLimitRepository.getLimitForPackage(pkg)
                     val evaluation = usageRuleEngine.evaluate(pkg, currentUsageMs, currentLimitMs)
+                    val willTrigger = evaluation.limitState == LimitState.LIMIT_REACHED
+                    val timestamp = timeProvider()
 
-                    safeLogD(TAG, "LIVE_POLL_EVAL package=$pkg usedMs=$currentUsageMs limitMs=$currentLimitMs state=${evaluation.limitState}")
+                    safeLogD(TAG, "LIVE_POLL_EVAL time=$timestamp package=$pkg usedMs=$currentUsageMs limitMs=$currentLimitMs state=${evaluation.limitState} trigger=$willTrigger launch=$willTrigger")
                     enforcementTriggerRepository.recordRuleEvaluation(pkg, currentUsageMs, currentLimitMs, evaluation.limitState)
+                    enforcementTriggerRepository.recordMonitoringCycle(
+                        timestamp = timestamp,
+                        packageName = pkg,
+                        isSelected = true,
+                        isMonitoringActive = !willTrigger,
+                        currentUsageMs = currentUsageMs,
+                        configuredLimitMs = currentLimitMs,
+                        ruleResult = evaluation.limitState,
+                        triggerEmitted = willTrigger,
+                        launchAttempted = willTrigger
+                    )
 
-                    if (evaluation.limitState == LimitState.LIMIT_REACHED) {
+                    if (willTrigger) {
                         val trigger = EnforcementTrigger(
                             packageName = pkg,
                             reason = LimitState.LIMIT_REACHED,
-                            detectedAtElapsedRealtimeMs = timeProvider()
+                            detectedAtElapsedRealtimeMs = timestamp
                         )
                         safeLogD(TAG, "LIVE_BREACH_DETECTED package=$pkg")
                         enforcementTriggerRepository.emitTrigger(trigger)

@@ -13,6 +13,8 @@ import com.scrollstop.data.repository.SharedPreferencesEnforcementTriggerReposit
 import com.scrollstop.data.repository.SharedPreferencesSelectedAppsRepository
 import com.scrollstop.data.repository.UsageStatsRepository
 import com.scrollstop.domain.rules.UsageRuleEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
 
 /**
  * Lightweight Thread-safe Service Locator providing access to shared repository instances.
@@ -95,24 +97,51 @@ object ServiceLocator {
 
     fun getLiveLimitEnforcementEngine(
         context: Context,
-        scope: kotlinx.coroutines.CoroutineScope,
+        scope: CoroutineScope,
         checkIntervalMs: Long = com.scrollstop.domain.detection.LiveLimitEnforcementEngine.DEFAULT_CHECK_INTERVAL_MS,
+        isTransientPackage: (String) -> Boolean = { pkg ->
+            pkg.equals("android", ignoreCase = true) || pkg.equals("com.android.systemui", ignoreCase = true)
+        },
         onTriggerEmitted: ((com.scrollstop.domain.model.EnforcementTrigger) -> Unit)? = null
     ): com.scrollstop.domain.detection.LiveLimitEnforcementEngine {
-        return liveLimitEnforcementEngine ?: synchronized(this) {
-            liveLimitEnforcementEngine ?: com.scrollstop.domain.detection.LiveLimitEnforcementEngine(
-                selectedAppsRepository = getSelectedAppsRepository(context),
-                dailyLimitRepository = getDailyLimitRepository(context),
-                usageStatsRepository = getUsageStatsRepository(context),
-                usageRuleEngine = getUsageRuleEngine(),
-                enforcementTriggerRepository = getEnforcementTriggerRepository(context),
-                selfPackageName = context.packageName,
-                checkIntervalMs = checkIntervalMs,
-                scope = scope,
-                onTriggerEmitted = onTriggerEmitted
-            ).also {
-                liveLimitEnforcementEngine = it
+        val existing = liveLimitEnforcementEngine
+        if (existing != null && scope.isActive) {
+            if (onTriggerEmitted != null) {
+                existing.onTriggerEmitted = onTriggerEmitted
             }
+            return existing
+        }
+        return synchronized(this) {
+            val current = liveLimitEnforcementEngine
+            if (current != null && scope.isActive) {
+                if (onTriggerEmitted != null) {
+                    current.onTriggerEmitted = onTriggerEmitted
+                }
+                current
+            } else {
+                current?.stopMonitoring()
+                com.scrollstop.domain.detection.LiveLimitEnforcementEngine(
+                    selectedAppsRepository = getSelectedAppsRepository(context),
+                    dailyLimitRepository = getDailyLimitRepository(context),
+                    usageStatsRepository = getUsageStatsRepository(context),
+                    usageRuleEngine = getUsageRuleEngine(),
+                    enforcementTriggerRepository = getEnforcementTriggerRepository(context),
+                    selfPackageName = context.packageName,
+                    checkIntervalMs = checkIntervalMs,
+                    scope = scope,
+                    isTransientPackage = isTransientPackage,
+                    onTriggerEmitted = onTriggerEmitted
+                ).also {
+                    liveLimitEnforcementEngine = it
+                }
+            }
+        }
+    }
+
+    fun resetLiveLimitEnforcementEngine() {
+        synchronized(this) {
+            liveLimitEnforcementEngine?.stopMonitoring()
+            liveLimitEnforcementEngine = null
         }
     }
 

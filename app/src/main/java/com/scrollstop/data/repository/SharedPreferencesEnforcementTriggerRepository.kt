@@ -37,6 +37,16 @@ class SharedPreferencesEnforcementTriggerRepository(
         private const val KEY_DIAG_RULE_USED_MS = "diag_rule_used_ms"
         private const val KEY_DIAG_RULE_LIMIT_MS = "diag_rule_limit_ms"
 
+        private const val KEY_DIAG_MONITOR_TIMESTAMP = "diag_monitor_timestamp"
+        private const val KEY_DIAG_MONITOR_PKG = "diag_monitor_pkg"
+        private const val KEY_DIAG_MONITOR_SELECTED = "diag_monitor_selected"
+        private const val KEY_DIAG_MONITOR_ACTIVE = "diag_monitor_active"
+        private const val KEY_DIAG_MONITOR_USAGE_MS = "diag_monitor_usage_ms"
+        private const val KEY_DIAG_MONITOR_LIMIT_MS = "diag_monitor_limit_ms"
+        private const val KEY_DIAG_MONITOR_RULE_STATE = "diag_monitor_rule_state"
+        private const val KEY_DIAG_MONITOR_TRIGGER_EMITTED = "diag_monitor_trigger_emitted"
+        private const val KEY_DIAG_MONITOR_LAUNCH_ATTEMPTED = "diag_monitor_launch_attempted"
+
         private const val TAG = "ScrollStopDebug"
     }
 
@@ -93,6 +103,21 @@ class SharedPreferencesEnforcementTriggerRepository(
         val usedMs = prefs.getLong(KEY_DIAG_RULE_USED_MS, 0L)
         val limitMs = prefs.getLong(KEY_DIAG_RULE_LIMIT_MS, 0L)
 
+        val monTimestamp = prefs.getLong(KEY_DIAG_MONITOR_TIMESTAMP, 0L)
+        val monPkg = prefs.getString(KEY_DIAG_MONITOR_PKG, null)
+        val monSelected = if (prefs.contains(KEY_DIAG_MONITOR_SELECTED)) {
+            prefs.getBoolean(KEY_DIAG_MONITOR_SELECTED, false)
+        } else null
+        val monActive = prefs.getBoolean(KEY_DIAG_MONITOR_ACTIVE, false)
+        val monUsageMs = prefs.getLong(KEY_DIAG_MONITOR_USAGE_MS, 0L)
+        val monLimitMs = prefs.getLong(KEY_DIAG_MONITOR_LIMIT_MS, 0L)
+        val monRuleStateStr = prefs.getString(KEY_DIAG_MONITOR_RULE_STATE, null)
+        val monRuleState = if (monRuleStateStr != null) {
+            try { LimitState.valueOf(monRuleStateStr) } catch (e: Exception) { null }
+        } else null
+        val monTriggerEmitted = prefs.getBoolean(KEY_DIAG_MONITOR_TRIGGER_EMITTED, false)
+        val monLaunchAttempted = prefs.getBoolean(KEY_DIAG_MONITOR_LAUNCH_ATTEMPTED, false)
+
         return DiagnosticInfo(
             lastEventPackage = eventPkg,
             lastDetectionPackage = detectionPkg,
@@ -100,7 +125,16 @@ class SharedPreferencesEnforcementTriggerRepository(
             lastRulePackage = rulePkg,
             lastRuleState = ruleState,
             lastRuleUsedMs = usedMs,
-            lastRuleLimitMs = limitMs
+            lastRuleLimitMs = limitMs,
+            lastMonitoringTimestamp = monTimestamp,
+            lastMonitoringPackage = monPkg,
+            lastMonitoringSelected = monSelected,
+            lastMonitoringActive = monActive,
+            lastMonitoringUsageMs = monUsageMs,
+            lastMonitoringLimitMs = monLimitMs,
+            lastMonitoringRuleState = monRuleState,
+            lastMonitoringTriggerEmitted = monTriggerEmitted,
+            lastMonitoringLaunchAttempted = monLaunchAttempted
         )
     }
 
@@ -158,6 +192,42 @@ class SharedPreferencesEnforcementTriggerRepository(
             lastRuleState = state,
             lastRuleUsedMs = usedMs,
             lastRuleLimitMs = limitMs
+        )
+    }
+
+    override fun recordMonitoringCycle(
+        timestamp: Long,
+        packageName: String,
+        isSelected: Boolean,
+        isMonitoringActive: Boolean,
+        currentUsageMs: Long,
+        configuredLimitMs: Long,
+        ruleResult: LimitState,
+        triggerEmitted: Boolean,
+        launchAttempted: Boolean
+    ) {
+        prefs.edit()
+            .putLong(KEY_DIAG_MONITOR_TIMESTAMP, timestamp)
+            .putString(KEY_DIAG_MONITOR_PKG, packageName)
+            .putBoolean(KEY_DIAG_MONITOR_SELECTED, isSelected)
+            .putBoolean(KEY_DIAG_MONITOR_ACTIVE, isMonitoringActive)
+            .putLong(KEY_DIAG_MONITOR_USAGE_MS, currentUsageMs)
+            .putLong(KEY_DIAG_MONITOR_LIMIT_MS, configuredLimitMs)
+            .putString(KEY_DIAG_MONITOR_RULE_STATE, ruleResult.name)
+            .putBoolean(KEY_DIAG_MONITOR_TRIGGER_EMITTED, triggerEmitted)
+            .putBoolean(KEY_DIAG_MONITOR_LAUNCH_ATTEMPTED, launchAttempted)
+            .apply()
+
+        _diagnosticInfo.value = _diagnosticInfo.value.copy(
+            lastMonitoringTimestamp = timestamp,
+            lastMonitoringPackage = packageName,
+            lastMonitoringSelected = isSelected,
+            lastMonitoringActive = isMonitoringActive,
+            lastMonitoringUsageMs = currentUsageMs,
+            lastMonitoringLimitMs = configuredLimitMs,
+            lastMonitoringRuleState = ruleResult,
+            lastMonitoringTriggerEmitted = triggerEmitted,
+            lastMonitoringLaunchAttempted = launchAttempted
         )
     }
 

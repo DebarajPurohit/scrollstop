@@ -2,10 +2,12 @@ package com.scrollstop.service
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Context
 import android.content.Intent
 import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.inputmethod.InputMethodManager
 import com.scrollstop.data.di.ServiceLocator
 import com.scrollstop.data.repository.AccessibilityServiceHealthRepository
 import com.scrollstop.data.repository.DailyLimitRepository
@@ -66,18 +68,28 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
             selfPackageName = packageName
         )
 
+        val imeProvider: () -> Set<String> = {
+            try {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.enabledInputMethodList?.map { it.packageName.lowercase() }?.toSet() ?: emptySet()
+            } catch (e: Throwable) {
+                emptySet()
+            }
+        }
+
+        val isTransient: (String) -> Boolean = { pkg ->
+            val p = pkg.trim().lowercase()
+            p == "android" || p == "com.android.systemui" || imeProvider().contains(p)
+        }
+
         liveEnforcementEngine = ServiceLocator.getLiveLimitEnforcementEngine(
             context = this,
             scope = serviceScope,
+            isTransientPackage = isTransient,
             onTriggerEmitted = { trigger ->
                 launchBlockingUi(trigger.packageName)
             }
         )
-        val existingCallback = liveEnforcementEngine.onTriggerEmitted
-        liveEnforcementEngine.onTriggerEmitted = { trigger ->
-            existingCallback?.invoke(trigger)
-            launchBlockingUi(trigger.packageName)
-        }
     }
 
     public override fun onServiceConnected() {
@@ -175,6 +187,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         if (::liveEnforcementEngine.isInitialized) {
             liveEnforcementEngine.stopMonitoring()
         }
+        ServiceLocator.resetLiveLimitEnforcementEngine()
         serviceScope.cancel()
         super.onDestroy()
     }
