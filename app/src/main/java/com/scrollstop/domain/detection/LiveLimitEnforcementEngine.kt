@@ -41,7 +41,7 @@ class LiveLimitEnforcementEngine(
     private val scope: CoroutineScope,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val timeProvider: () -> Long = { SystemClock.elapsedRealtime() },
-    private val isTransientPackage: (String) -> Boolean = { pkg ->
+    var isTransientPackage: (String) -> Boolean = { pkg ->
         pkg.equals("android", ignoreCase = true) ||
         pkg.equals("com.android.systemui", ignoreCase = true)
     },

@@ -68,24 +68,11 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
             selfPackageName = packageName
         )
 
-        val imeProvider: () -> Set<String> = {
-            try {
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.enabledInputMethodList?.map { it.packageName.lowercase() }?.toSet() ?: emptySet()
-            } catch (e: Throwable) {
-                emptySet()
-            }
-        }
-
-        val isTransient: (String) -> Boolean = { pkg ->
-            val p = pkg.trim().lowercase()
-            p == "android" || p == "com.android.systemui" || imeProvider().contains(p)
-        }
-
+        val imeDetector = com.scrollstop.util.ImePackageDetector(this)
         liveEnforcementEngine = ServiceLocator.getLiveLimitEnforcementEngine(
             context = this,
             scope = serviceScope,
-            isTransientPackage = isTransient,
+            isTransientPackage = { pkg -> imeDetector.isImeOrTransient(pkg) },
             onTriggerEmitted = { trigger ->
                 launchBlockingUi(trigger.packageName)
             }

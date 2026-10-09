@@ -194,6 +194,65 @@ class AndroidUsageStatsRepositoryTest {
         assertEquals(100_000L, usageMap[pkg])
     }
 
+    @Test
+    fun `getTodayUsageForPackages correctly preserves ongoing session when older activity emits ACTIVITY_STOPPED after new activity resumed`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "in.amazon.mShop.android.shopping"
+        val t0 = fakeTimeProvider.currentTime - 180_000L // 3 minutes ago
+        val t1 = fakeTimeProvider.currentTime - 120_000L // SearchActivity resumes
+        val t2 = fakeTimeProvider.currentTime - 110_000L // HomeActivity pauses
+        val t3 = fakeTimeProvider.currentTime - 90_000L  // HomeActivity stops while SearchActivity continues
+
+        // HomeActivity resumes at t0
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("HomeActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        // SearchActivity resumes at t1
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("SearchActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t1)
+                .build()
+        )
+        // HomeActivity pauses at t2
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("HomeActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t2)
+                .build()
+        )
+        // HomeActivity stops at t3
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("HomeActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_STOPPED)
+                .setTimeStamp(t3)
+                .build()
+        )
+
+        // Session must continue with SearchActivity until currentTime (180s total)
+        val result = repository.getTodayUsageForPackages(setOf(pkg))
+        assertTrue(result.isSuccess)
+        val usageMap = result.getOrThrow()
+        assertEquals(180_000L, usageMap[pkg])
+    }
+
     private class FakeTimeProvider(
         var currentTime: Long,
         var startOfDay: Long

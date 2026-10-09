@@ -138,9 +138,8 @@ class AndroidUsageStatsRepository(
                     UsageEvents.Event.ACTIVITY_STOPPED -> {
                         val activeSet = resumedActivitiesMap[pkg]
                         if (activeSet != null && activeSet.isNotEmpty()) {
-                            val removed = activeSet.remove(className)
-                            if (activeSet.isEmpty() || (!removed && activeSet.size == 1)) {
-                                activeSet.clear()
+                            activeSet.remove(className)
+                            if (activeSet.isEmpty()) {
                                 val start = currentSessionStartMap.remove(pkg)
                                 if (start != null && eventTime > start) {
                                     val sessionDuration = eventTime - start

@@ -100,12 +100,13 @@ object ServiceLocator {
         scope: CoroutineScope,
         checkIntervalMs: Long = com.scrollstop.domain.detection.LiveLimitEnforcementEngine.DEFAULT_CHECK_INTERVAL_MS,
         isTransientPackage: (String) -> Boolean = { pkg ->
-            pkg.equals("android", ignoreCase = true) || pkg.equals("com.android.systemui", ignoreCase = true)
+            com.scrollstop.util.ImePackageDetector(context).isImeOrTransient(pkg)
         },
         onTriggerEmitted: ((com.scrollstop.domain.model.EnforcementTrigger) -> Unit)? = null
     ): com.scrollstop.domain.detection.LiveLimitEnforcementEngine {
         val existing = liveLimitEnforcementEngine
         if (existing != null && scope.isActive) {
+            existing.isTransientPackage = isTransientPackage
             if (onTriggerEmitted != null) {
                 existing.onTriggerEmitted = onTriggerEmitted
             }
@@ -114,6 +115,7 @@ object ServiceLocator {
         return synchronized(this) {
             val current = liveLimitEnforcementEngine
             if (current != null && scope.isActive) {
+                current.isTransientPackage = isTransientPackage
                 if (onTriggerEmitted != null) {
                     current.onTriggerEmitted = onTriggerEmitted
                 }

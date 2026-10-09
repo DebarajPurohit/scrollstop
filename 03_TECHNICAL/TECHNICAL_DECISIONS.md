@@ -131,3 +131,23 @@ password/security credentials.\
    - Persist and display timestamped monitoring cycle fields (`lastMonitoringTimestamp`, `lastMonitoringPackage`, `lastMonitoringActive`, `lastMonitoringUsageMs`, `lastMonitoringLimitMs`, `lastMonitoringRuleState`, `lastMonitoringTriggerEmitted`, `lastMonitoringLaunchAttempted`) in `SharedPreferencesEnforcementTriggerRepository` and on the Dev Diagnostic card.
 **Reason:** Eliminates live enforcement failure on physical hardware where continuous usage of a 0-usage app failed to trigger live limit crossing due to Android OS aggregation buffering and transient window cancellations.
 
+### TD-014 --- Multi-Layered IME Detection & Multi-Activity Ongoing Session Preservation (POC-06 Follow-up)
+
+**Status:** Approved (POC-06 Follow-up)
+**Decision:**
+1. Manifest Package Visibility for IMEs:
+   - Added `<intent><action android:name="android.view.InputMethod" /></intent>` to the `<queries>` element in `AndroidManifest.xml`.
+   - On Android 11+ (API 30+), package visibility restrictions prevent applications from querying third-party or OEM keyboards that do not directly interact with the app. Declaring the `InputMethod` action grants visibility across `PackageManager` and `InputMethodManager`.
+2. Multi-Layered `ImePackageDetector`:
+   - Created `com.scrollstop.util.ImePackageDetector` encapsulating six verification layers:
+     - Fast O(1) checks for system UI overlays (`android`, `com.android.systemui`, `*.systemui`).
+     - Signatures for dominant Android keyboards (Gboard, Samsung Honeyboard, SwiftKey, etc.).
+     - Generic package name heuristics (`inputmethod`, `latinime`, `keyboard`, `*.ime`).
+     - Dynamic `InputMethodManager.getEnabledInputMethodList` & `getInputMethodList` with 10-second cache.
+     - Dynamic `PackageManager.queryIntentServices(Intent("android.view.InputMethod"), 0)`.
+     - `Settings.Secure.ENABLED_INPUT_METHODS` and `DEFAULT_INPUT_METHOD` parsing.
+   - Updated `ServiceLocator.getLiveLimitEnforcementEngine` to propagate `isTransientPackage` to existing cached engine instances.
+3. Session-Preserving Activity Transition Handling in `AndroidUsageStatsRepository`:
+   - Removed faulty `(!removed && activeSet.size == 1)` condition in `calculateUsageFromEvents`. When an app transitions internally (e.g. Amazon Home -> SearchActivity), the previous activity emits `ACTIVITY_STOPPED` after `ACTIVITY_PAUSED`. Removing an already-paused activity now safely leaves the active set intact.
+   - The ongoing session is preserved until all activities of the package are paused/stopped or the app is closed.
+**Reason:** Fixes physical device regression where opening the soft keyboard in Amazon (e.g., search bar) terminated live usage monitoring or froze usage accumulation.

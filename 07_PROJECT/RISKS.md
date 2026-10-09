@@ -46,9 +46,13 @@
               activity launch              works on AOSP/Samsung; document OEM popup permission
               restrictions                 toggles (Xiaomi/Oppo) in testing matrix.
 
-  R-011       Transient window High       Low          Ignore 'android', 'com.android.systemui',        Mitigated (POC-06)
-              interrupts live                          and enabled IMEs during active monitoring       
-              monitoring                               without cancelling loop (TD-013)                 
+  R-011       Transient window High       Low          Ignore 'android', 'com.android.systemui',        Mitigated (POC-06 Follow-up)
+              interrupts live                          and IMEs during active monitoring via            
+              monitoring                               ImePackageDetector & manifest queries (TD-014)   
+
+  R-012       Multi-activity  High        Low          Preserve active activity set in UsageEvents      Mitigated (POC-06 Follow-up)
+              internal transition                      reconstruction; avoid clearing ongoing session   
+              resets ongoing usage                     when older activity stops (TD-014)               
   -------------------------------------------------------------------------------------------------------------------------
 
 ## Risk Rule
