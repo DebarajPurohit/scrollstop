@@ -79,6 +79,10 @@ class LiveLimitEnforcementEngine(
 
         synchronized(lock) {
             if (packageName.isNullOrBlank()) {
+                if (currentMonitoredPackage != null) {
+                    safeLogD(TAG, "LIVE_MONITOR_TRANSIENT_BLANK_PACKAGE activeMonitor=$currentMonitoredPackage")
+                    return
+                }
                 stopMonitoringLocked()
                 return
             }
@@ -92,8 +96,8 @@ class LiveLimitEnforcementEngine(
             }
 
             // If an active restricted app is currently being monitored, check if the incoming window
-            // event belongs to a transient system overlay or keyboard (IME). If so, ignore the transient
-            // window without stopping the continuous monitor for the active app.
+            // event belongs to a transient system overlay, autofill, dialog, or keyboard (IME).
+            // If so, ignore the transient window without stopping the continuous monitor for the active app.
             if (currentMonitoredPackage != null && isTransientPackage(pkg)) {
                 safeLogD(TAG, "LIVE_MONITOR_TRANSIENT_SYSTEM_EVENT pkg=$pkg activeMonitor=$currentMonitoredPackage")
                 return
@@ -110,7 +114,7 @@ class LiveLimitEnforcementEngine(
             }
 
             // If already monitoring this exact package and job is active, do not duplicate
-            if (currentMonitoredPackage == pkg && monitoringJob?.isActive == true) {
+            if (currentMonitoredPackage.equals(pkg, ignoreCase = true) && monitoringJob?.isActive == true) {
                 safeLogD(TAG, "LIVE_MONITOR_ALREADY_ACTIVE package=$pkg")
                 return
             }

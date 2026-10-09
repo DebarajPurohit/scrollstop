@@ -136,7 +136,12 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
     private fun launchBlockingUi(packageName: String) {
         try {
             val intent = Intent(this, com.scrollstop.MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+                )
                 putExtra(com.scrollstop.MainActivity.EXTRA_BLOCKED_PACKAGE, packageName)
             }
             startActivity(intent)

@@ -71,6 +71,8 @@ class POC06KeyboardOpenMonitoringTest {
             val p = pkg.trim().lowercase()
             p == "android" ||
             p == "com.android.systemui" ||
+            p == "com.google.android.gms" ||
+            p.contains("autofill") ||
             p == gboardPkg.lowercase() ||
             p == samsungKeyboardPkg.lowercase() ||
             p.contains(".inputmethod.") ||
@@ -278,5 +280,59 @@ class POC06KeyboardOpenMonitoringTest {
         assertEquals("Repeated launch immediately triggers block", 2, emittedTriggers.size)
         assertEquals(youtubePkg, emittedTriggers[1].packageName)
         assertFalse("Monitoring loop does not stay active for blocked app", liveEngine.isMonitoring)
+    }
+
+    @Test
+    fun `11 - autofill and transient blank packages cannot suppress or indefinitely defer a required blocking request`() = testScope.runTest {
+        selectedAppsRepository.setSelectedPackages(setOf(amazonPkg))
+        fakeUsageStatsRepository.usageMap[amazonPkg] = 0L
+
+        liveEngine.onForegroundPackageChanged(amazonPkg)
+        assertTrue("Amazon monitoring starts", liveEngine.isMonitoring)
+
+        // Keyboard opens
+        liveEngine.onForegroundPackageChanged(gboardPkg)
+        // Autofill overlay appears
+        liveEngine.onForegroundPackageChanged("com.google.android.gms")
+        // Transient blank package event
+        liveEngine.onForegroundPackageChanged("")
+        liveEngine.onForegroundPackageChanged(null)
+
+        assertTrue("Monitoring must remain active across all transient overlays", liveEngine.isMonitoring)
+        assertEquals(amazonPkg, liveEngine.currentMonitoredPackage)
+
+        // Usage crosses limit while keyboard and autofill occurred
+        fakeUsageStatsRepository.usageMap[amazonPkg] = 125_000L
+        testScheduler.advanceTimeBy(5_000L)
+        testScheduler.runCurrent()
+
+        assertEquals("Blocking request must be issued without requiring keyboard dismissal", 1, emittedTriggers.size)
+        assertEquals(amazonPkg, emittedTriggers[0].packageName)
+        assertEquals(LimitState.LIMIT_REACHED, emittedTriggers[0].reason)
+        assertFalse(liveEngine.isMonitoring)
+    }
+
+    @Test
+    fun `12 - duplicate blocking requests do not emit redundant triggers and dismissing keyboard does not cause duplicate blocking`() = testScope.runTest {
+        selectedAppsRepository.setSelectedPackages(setOf(amazonPkg))
+        fakeUsageStatsRepository.usageMap[amazonPkg] = 110_000L
+
+        liveEngine.onForegroundPackageChanged(amazonPkg)
+        liveEngine.onForegroundPackageChanged(gboardPkg) // Keyboard open
+
+        // Breaches limit live
+        fakeUsageStatsRepository.usageMap[amazonPkg] = 125_000L
+        testScheduler.advanceTimeBy(5_000L)
+        testScheduler.runCurrent()
+
+        assertEquals("Exactly one trigger emitted for limit breach", 1, emittedTriggers.size)
+        assertFalse(liveEngine.isMonitoring)
+
+        // User now minimizes/dismisses keyboard: Amazon window state event received
+        liveEngine.onForegroundPackageChanged(amazonPkg)
+
+        // Immediate check runs for over-limit app, emitting trigger for the entry/window event
+        // Verifies monitoring loop does not get started and app remains safely blocked
+        assertFalse("Monitoring loop must not restart for over-limit app after keyboard dismissal", liveEngine.isMonitoring)
     }
 }

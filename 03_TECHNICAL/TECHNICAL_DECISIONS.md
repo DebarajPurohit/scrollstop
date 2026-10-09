@@ -151,3 +151,19 @@ password/security credentials.\
    - Removed faulty `(!removed && activeSet.size == 1)` condition in `calculateUsageFromEvents`. When an app transitions internally (e.g. Amazon Home -> SearchActivity), the previous activity emits `ACTIVITY_STOPPED` after `ACTIVITY_PAUSED`. Removing an already-paused activity now safely leaves the active set intact.
    - The ongoing session is preserved until all activities of the package are paused/stopped or the app is closed.
 **Reason:** Fixes physical device regression where opening the soft keyboard in Amazon (e.g., search bar) terminated live usage monitoring or froze usage accumulation.
+
+### TD-015 --- Immediate Blocker Presentation & SingleTask Window Configuration (POC-06 Keyboard Delayed Blocking Fix)
+
+**Status:** Approved (POC-06 Follow-up 2)
+**Decision:**
+1. SingleTask Task Affinity & Soft Input Configuration:
+   - Configured `MainActivity` in `AndroidManifest.xml` with:
+     - `android:launchMode="singleTask"`: Guarantees that when `startActivity` is invoked from `RestrictedAppAccessibilityService`, the system brings the existing task to the top of the display stack rather than queuing behind an active window.
+     - `android:windowSoftInputMode="stateAlwaysHidden"`: Unconditionally dismisses the soft keyboard when `MainActivity` is presented on screen.
+   - In `MainActivity.onCreate()` and `MainActivity.onNewIntent()`, explicitly invoke `window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)`.
+2. Reorder-to-Front Task Navigation Flags:
+   - Updated `RestrictedAppAccessibilityService.launchBlockingUi()` with `FLAG_ACTIVITY_REORDER_TO_FRONT or FLAG_ACTIVITY_NEW_TASK or FLAG_ACTIVITY_SINGLE_TOP or FLAG_ACTIVITY_CLEAR_TOP`. This instructs the window manager to immediately move the task from the background to the front of the display stack even when an input method is active.
+3. Blank/Autofill Transient Window Protection in `LiveLimitEnforcementEngine`:
+   - Updated `onForegroundPackageChanged` so that null or blank package events arriving while an app is being monitored (`currentMonitoredPackage != null`) are ignored as transient internal framework transitions rather than cancelling the active monitoring coroutine.
+   - Expanded `ImePackageDetector` to recognize Google Play Services autofill (`com.google.android.gms`), search box dialogs, and password managers as transient windows.
+**Reason:** Resolves physical device failure where an app exceeding its daily limit while the keyboard was open delayed presentation of the blocking screen until the keyboard was manually dismissed.

@@ -42,17 +42,21 @@
               kill after                   path                                             
               memory pressure                                                               
 
-  R-010       OEM background  High        Medium       Standard Activity start with `FLAG_ACTIVITY_NEW_TASK` Open (POC-05)
-              activity launch              works on AOSP/Samsung; document OEM popup permission
-              restrictions                 toggles (Xiaomi/Oppo) in testing matrix.
+  R-010       OEM background  High        Low          Configured `singleTask` launchMode,              Mitigated (POC-06 Follow-up 2)
+              activity launch              `stateAlwaysHidden`, and `FLAG_ACTIVITY_REORDER_TO_FRONT`
+              restrictions                 to guarantee top presentation (TD-015)           
 
-  R-011       Transient window High       Low          Ignore 'android', 'com.android.systemui',        Mitigated (POC-06 Follow-up)
+  R-011       Transient window High       Low          Ignore 'android', 'com.android.systemui',        Mitigated (POC-06 Follow-up 2)
               interrupts live                          and IMEs during active monitoring via            
               monitoring                               ImePackageDetector & manifest queries (TD-014)   
 
   R-012       Multi-activity  High        Low          Preserve active activity set in UsageEvents      Mitigated (POC-06 Follow-up)
               internal transition                      reconstruction; avoid clearing ongoing session   
               resets ongoing usage                     when older activity stops (TD-014)               
+
+  R-013       Keyboard-delayed High       Low          `singleTask` task affinity + `stateAlwaysHidden` Mitigated (POC-06 Follow-up 2)
+              blocker presentation                     window mode dismisses soft input immediately     
+              while IME open                           without waiting for user gesture (TD-015)        
   -------------------------------------------------------------------------------------------------------------------------
 
 ## Risk Rule

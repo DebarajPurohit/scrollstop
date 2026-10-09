@@ -32,6 +32,14 @@ class ImePackageDetectorTest {
     }
 
     @Test
+    fun `detects autofill and framework services as transient`() {
+        assertTrue(detector.isImeOrTransient("com.google.android.gms"))
+        assertTrue(detector.isImeOrTransient("com.example.autofill.service"))
+        assertTrue(detector.isImeOrTransient("com.secure.passwords.manager"))
+        assertTrue(detector.isImeOrTransient("com.google.android.googlequicksearchbox"))
+    }
+
+    @Test
     fun `detects dominant OEM and third-party keyboards as transient`() {
         assertTrue(detector.isImeOrTransient("com.google.android.inputmethod.latin")) // Gboard
         assertTrue(detector.isImeOrTransient("com.samsung.android.honeyboard")) // Samsung Keyboard

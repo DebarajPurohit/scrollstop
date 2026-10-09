@@ -11,12 +11,12 @@ import android.view.inputmethod.InputMethodManager
  * Robust detector for Input Method Editors (keyboards) and transient system UI overlays.
  *
  * Guarantees that keyboard appearances, soft input mode transitions, system overlays,
- * and dialogs do not prematurely terminate live limit monitoring for an underlying restricted app.
+ * autofill services, and dialogs do not prematurely terminate live limit monitoring for an underlying restricted app.
  *
  * Detection Layers:
- * 1. Fast O(1) matching for system UI overlays (android, com.android.systemui, *.systemui).
+ * 1. Fast O(1) matching for system UI overlays, autofill, and framework components.
  * 2. Signature matching for dominant Android keyboards (Gboard, Samsung Honeyboard, SwiftKey, etc.).
- * 3. Generic naming heuristics (*.inputmethod.*, *.keyboard, *.latinime, *.ime).
+ * 3. Generic naming heuristics (*inputmethod*, *keyboard*, *latinime*, *.ime, *autofill*, *password*).
  * 4. Dynamic query of [InputMethodManager.getEnabledInputMethodList] and [InputMethodManager.getInputMethodList].
  * 5. Dynamic query of [PackageManager.queryIntentServices] for android.view.InputMethod.
  * 6. Parsing of [Settings.Secure.ENABLED_INPUT_METHODS] and [Settings.Secure.DEFAULT_INPUT_METHOD].
@@ -32,8 +32,17 @@ class ImePackageDetector(
         val pkg = packageName.trim().lowercase()
         if (pkg.isEmpty()) return false
 
-        // 1. Transient system overlays and framework dialogs
-        if (pkg == "android" || pkg == "com.android.systemui" || pkg.endsWith(".systemui")) {
+        // 1. Transient system overlays, autofill, and framework dialogs
+        if (pkg == "android" ||
+            pkg == "com.android.systemui" ||
+            pkg.endsWith(".systemui") ||
+            pkg.contains(".systemui") ||
+            pkg == "com.google.android.gms" ||
+            pkg.contains("autofill") ||
+            pkg.contains("passwords") ||
+            pkg.contains("authenticator") ||
+            pkg.contains("quicksearchbox")
+        ) {
             return true
         }
 
@@ -60,7 +69,7 @@ class ImePackageDetector(
             return true
         }
 
-        // 4-6. Query system services with 10-second refresh cache
+        // 4-6. Query system IME services with 10-second refresh cache
         val now = timeProvider()
         if (cachedImePackages.isEmpty() || now - lastQueryTimeMs > 10_000L) {
             refreshImePackages()
