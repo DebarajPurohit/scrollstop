@@ -121,7 +121,7 @@ object ServiceLocator {
         onTriggerEmitted: ((com.scrollstop.domain.model.EnforcementTrigger) -> Unit)? = null
     ): com.scrollstop.domain.detection.LiveLimitEnforcementEngine {
         val existing = liveLimitEnforcementEngine
-        if (existing != null && scope.isActive) {
+        if (existing != null && existing.scope.isActive && existing.scope == scope) {
             existing.isTransientPackage = isTransientPackage
             if (onTriggerEmitted != null) {
                 existing.onTriggerEmitted = onTriggerEmitted
@@ -130,7 +130,7 @@ object ServiceLocator {
         }
         return synchronized(this) {
             val current = liveLimitEnforcementEngine
-            if (current != null && scope.isActive) {
+            if (current != null && current.scope.isActive && current.scope == scope) {
                 current.isTransientPackage = isTransientPackage
                 if (onTriggerEmitted != null) {
                     current.onTriggerEmitted = onTriggerEmitted

@@ -15,6 +15,7 @@ import com.scrollstop.data.time.TimeProvider
 interface UsageStatsRepository {
     fun hasUsagePermission(): Boolean
     fun getTodayUsageForPackages(packageNames: Set<String>): Result<Map<String, Long>>
+    fun getForegroundPackage(): String? = null
 }
 
 /**
@@ -57,6 +58,65 @@ class AndroidUsageStatsRepository(
             mode == AppOpsManager.MODE_ALLOWED
         } catch (e: Exception) {
             false
+        }
+    }
+
+    override fun getForegroundPackage(): String? {
+        if (!hasUsagePermission()) return null
+        return try {
+            val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return null
+
+            val endTime = timeProvider.currentTimeMillis()
+            // Inspect recent events (up to 5 minutes) to detect currently active foreground app
+            val startTime = maxOf(timeProvider.getStartOfDayMillis(), endTime - 300_000L)
+            val events = usageStatsManager.queryEvents(startTime, endTime)
+
+            val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
+            var lastResumedPkg: String? = null
+
+            if (events != null) {
+                val event = UsageEvents.Event()
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event)
+                    val pkg = event.packageName ?: continue
+                    val eventType = event.eventType
+                    val className = event.className ?: "default_activity"
+
+                    when (eventType) {
+                        UsageEvents.Event.ACTIVITY_RESUMED -> {
+                            resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }.add(className)
+                            lastResumedPkg = pkg
+                        }
+                        UsageEvents.Event.ACTIVITY_PAUSED,
+                        UsageEvents.Event.ACTIVITY_STOPPED -> {
+                            val activeSet = resumedActivitiesMap[pkg]
+                            if (activeSet != null) {
+                                activeSet.remove(className)
+                                if (activeSet.isEmpty()) {
+                                    resumedActivitiesMap.remove(pkg)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            val activePackages = resumedActivitiesMap.keys
+            if (activePackages.isNotEmpty()) {
+                if (lastResumedPkg != null && lastResumedPkg in activePackages) {
+                    lastResumedPkg
+                } else {
+                    activePackages.firstOrNull()
+                }
+            } else {
+                // Fallback: check queryUsageStats for most recent lastTimeUsed within last 60 seconds
+                val usageStatsList = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startTime, endTime)
+                val mostRecent = usageStatsList?.filter { (endTime - it.lastTimeUsed) <= 60_000L }?.maxByOrNull { it.lastTimeUsed }
+                mostRecent?.packageName
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 

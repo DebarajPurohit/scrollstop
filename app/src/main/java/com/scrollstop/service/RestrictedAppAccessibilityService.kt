@@ -46,9 +46,12 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
     private lateinit var usageStatsRepository: UsageStatsRepository
     private lateinit var enforcementTriggerRepository: EnforcementTriggerRepository
     private lateinit var healthRepository: AccessibilityServiceHealthRepository
+    private lateinit var protectionHealthRepository: com.scrollstop.data.repository.ProtectionHealthRepository
+    private lateinit var commitmentLockRepository: com.scrollstop.data.repository.CommitmentLockRepository
     private lateinit var detectionEngine: RestrictedAppDetectionEngine
     internal lateinit var liveEnforcementEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine
 
+    private var selectedPackagesJob: Job? = null
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun onCreate() {
@@ -58,6 +61,8 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         usageStatsRepository = ServiceLocator.getUsageStatsRepository(this)
         enforcementTriggerRepository = ServiceLocator.getEnforcementTriggerRepository(this)
         healthRepository = ServiceLocator.getAccessibilityHealthRepository()
+        protectionHealthRepository = ServiceLocator.getProtectionHealthRepository(this)
+        commitmentLockRepository = ServiceLocator.getCommitmentLockRepository(this)
         val ruleEngine = ServiceLocator.getUsageRuleEngine()
 
         detectionEngine = RestrictedAppDetectionEngine(
@@ -81,21 +86,50 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
     public override fun onServiceConnected() {
         super.onServiceConnected()
-        healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_ACTIVE)
-
         safeLogD(TAG, "SERVICE_CONNECTED")
 
+        // 1. Recheck permissions and service health during recovery
+        healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_ACTIVE)
+        protectionHealthRepository.refreshHealth(this)
+        val hasUsage = usageStatsRepository.hasUsagePermission()
+        safeLogD(TAG, "SERVICE_HEALTH_RECHECK hasUsagePermission=$hasUsage healthState=${protectionHealthRepository.healthState.value}")
+
+        // 2. Refresh commitment lock and expire stale midnight triggers
+        commitmentLockRepository.checkAndApplyMidnightTransitions()
+        enforcementTriggerRepository.checkAndExpireStaleTriggers()
+
+        // 3. Configure service info safely
         updateServiceConfig()
 
         val info = serviceInfo ?: currentConfigInfo
         val packageNamesStr = if (info?.packageNames == null) "null" else info.packageNames.joinToString(",")
         safeLogD(TAG, "SERVICE_CONFIG eventTypes=${info?.eventTypes} packageNames=$packageNamesStr canRetrieveWindowContent=${info?.canRetrieveWindowContent}")
 
-        // Dynamically update service config when selected packages change
-        serviceScope.launch {
+        // 4. Cancel any previous collection job to avoid duplicate polling/collection loops
+        selectedPackagesJob?.cancel()
+        selectedPackagesJob = serviceScope.launch {
             selectedAppsRepository.selectedPackageNames.collectLatest {
                 updateServiceConfig()
             }
+        }
+
+        // 5. Evaluate current foreground application on recovery/startup (if restricted app already active)
+        evaluateCurrentForegroundApp()
+    }
+
+    internal fun evaluateCurrentForegroundApp() {
+        if (!usageStatsRepository.hasUsagePermission()) {
+            safeLogD(TAG, "EVALUATE_FOREGROUND_SKIPPED missing_usage_permission")
+            return
+        }
+
+        val foregroundPkg = usageStatsRepository.getForegroundPackage() ?: return
+        safeLogD(TAG, "RECOVERY_FOREGROUND_DETECTED package=$foregroundPkg")
+
+        if (selectedAppsRepository.isSelected(foregroundPkg)) {
+            safeLogD(TAG, "RECOVERY_RESTRICTED_APP_FOUND package=$foregroundPkg")
+            enforcementTriggerRepository.recordEvent(foregroundPkg)
+            liveEnforcementEngine.onForegroundPackageChanged(foregroundPkg)
         }
     }
 
@@ -161,6 +195,8 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_INTERRUPTED)
+        selectedPackagesJob?.cancel()
+        selectedPackagesJob = null
         if (::liveEnforcementEngine.isInitialized) {
             liveEnforcementEngine.stopMonitoring()
         }
@@ -168,6 +204,8 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_NOT_GRANTED)
+        selectedPackagesJob?.cancel()
+        selectedPackagesJob = null
         if (::liveEnforcementEngine.isInitialized) {
             liveEnforcementEngine.stopMonitoring()
         }
@@ -176,6 +214,8 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         healthRepository.updateState(AccessibilityServiceState.ACCESSIBILITY_NOT_GRANTED)
+        selectedPackagesJob?.cancel()
+        selectedPackagesJob = null
         if (::liveEnforcementEngine.isInitialized) {
             liveEnforcementEngine.stopMonitoring()
         }

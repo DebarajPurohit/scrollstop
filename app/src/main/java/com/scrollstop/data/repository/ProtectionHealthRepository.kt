@@ -74,7 +74,9 @@ class AndroidProtectionHealthRepository(
     }
 
     override fun refreshHealth(context: Context) {
-        accessibilityHealthRepository.refreshState(context, RestrictedAppAccessibilityService::class.java)
+        if (accessibilityHealthRepository.serviceState.value != AccessibilityServiceState.ACCESSIBILITY_ACTIVE) {
+            accessibilityHealthRepository.refreshState(context, RestrictedAppAccessibilityService::class.java)
+        }
         val hasUsage = usageStatsRepository.hasUsagePermission()
         val accState = accessibilityHealthRepository.serviceState.value
         _healthState.value = calculateCurrentHealth(hasUsage, accState)

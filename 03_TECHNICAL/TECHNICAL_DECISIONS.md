@@ -207,3 +207,21 @@ password/security credentials.\
    - Monitoring resumes cleanly once permission is restored without corrupting user data or fabricating usage numbers.
 **Reason:** Ensures physical test safety, rock-solid persistence across device restarts, and deterministic compliance with Google Play and Android platform guidelines.
 
+### TD-018 --- Enforcement Recovery Lifecycle & Force-Stop Boundary Handling (Phase 4 Reliability Milestone)
+
+**Status:** Approved (Phase 4 Reliability Milestone)\
+**Decision:**
+1. Foreground Detection on Service Connection / Recovery:
+   - Add `getForegroundPackage(): String?` to `UsageStatsRepository` (`AndroidUsageStatsRepository`), reconstructing active foreground application from recent `UsageEvents` (with fallback to `queryUsageStats` recent `lastTimeUsed`).
+   - On `RestrictedAppAccessibilityService.onServiceConnected()`, immediately invoke `evaluateCurrentForegroundApp()`. If a selected restricted app is already in the foreground when the service starts or reconnects, `LiveLimitEnforcementEngine.onForegroundPackageChanged()` is invoked immediately, ensuring instant blocking if over limit or continuous live monitoring if within limit without waiting for an external window change event.
+2. Recovery Lifecycle & Coroutine Scope Hygiene:
+   - Cancel existing `selectedPackageNames` collector job on reconnection before starting a new one, eliminating duplicate collection loops across service reconnects.
+   - In `ServiceLocator.getLiveLimitEnforcementEngine`, validate that the engine's internal scope is active and matches the incoming `scope`. Recreate the engine cleanly if the previous service scope was cancelled or detached.
+   - On `onInterrupt()`, `onUnbind()`, and `onDestroy()`, cleanly cancel active package collection jobs, stop live monitoring, and transition service health states deterministically (`ACCESSIBILITY_INTERRUPTED` / `ACCESSIBILITY_NOT_GRANTED`).
+3. Permission Rechecks & State Synchronization:
+   - On `onServiceConnected()`, recheck `usageStatsRepository.hasUsagePermission()`. If missing, report protection as `USAGE_ACCESS_REQUIRED` rather than falsely claiming `PROTECTED`.
+   - Invoke `commitmentLockRepository.checkAndApplyMidnightTransitions()` and `enforcementTriggerRepository.checkAndExpireStaleTriggers()` upon service recovery, ensuring midnight transitions take effect even if `MainActivity` was not opened.
+4. Explicit Force-Stop OS Boundary Documentation:
+   - Recognize and document Android platform security architecture: When an application is explicitly force-stopped from Android Settings (`am force-stop`), the OS places the package in the stopped state (`FLAG_EXCLUDE_STOPPED_PACKAGES`). Android prevents all background components, broadcast receivers, and bound accessibility services from starting until the user explicitly launches the application from the launcher. No app can automatically circumvent this OS design. The valid, platform-compliant recovery path is for the user to open Stop Doom Scroll once to clear the stopped flag.
+**Reason:** Resolves physical-device failure where Stop Doom Scroll needed to be manually opened before enforcement resumed after restart, while respecting Android security boundaries and Play Store policies.
+

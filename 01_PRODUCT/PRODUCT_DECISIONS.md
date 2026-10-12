@@ -64,6 +64,15 @@ validation phase.\
 - Staged relaxation requests and commitment status persist across app restarts, process termination, and device reboots.
 - 1-hour cooling-off timer option is deferred from MVP to preserve clean, uncompromised commitment boundaries.
 
+### PD-010 --- Enforcement Recovery & Restart Reliability (Phase 4 Milestone)
+
+**Status:** Approved (Phase 4 Milestone)\
+**Decision:**
+1. Upon system reconnection or recovery of `RestrictedAppAccessibilityService` (e.g. following process recreation, system reboot, or service rebound), Stop Doom Scroll automatically re-evaluates protection health and inspects the currently foreground application.
+2. If a selected restricted application is already active in the foreground upon recovery, enforcement is initiated immediately without requiring the user to manually launch Stop Doom Scroll or trigger an external window transition.
+3. If usage permissions or service connectivity are interrupted, protection health reflects `USAGE_ACCESS_REQUIRED` or `ACCESSIBILITY_INTERRUPTED` rather than falsely reporting active protection.
+4. OS Force-Stop Boundary: In compliance with core Android platform security behavior, an app explicitly force-stopped via system Settings enters the stopped state and cannot run in the background until the user launches it from the home screen. Stop Doom Scroll acknowledges this OS limitation and directs users to tap the app icon to resume enforcement.
+
 ### Change Log
 
   Date         Change                       Reason
@@ -74,4 +83,5 @@ validation phase.\
   2026-10-08   Recorded PD-007              POC-05 Blocking UI & Enforcement Loop
   2026-10-08   Recorded PD-008              POC-05A Live Limit-Crossing Enforcement
   2026-10-11   Recorded PD-009              Commitment Lock MVP & Midnight Relaxation Schedule
+  2026-10-12   Recorded PD-010              Enforcement Recovery & Restart Reliability
 

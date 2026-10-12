@@ -38,7 +38,7 @@ class LiveLimitEnforcementEngine(
     private val enforcementTriggerRepository: EnforcementTriggerRepository,
     private val selfPackageName: String = DEFAULT_SELF_PACKAGE,
     val checkIntervalMs: Long = DEFAULT_CHECK_INTERVAL_MS,
-    private val scope: CoroutineScope,
+    val scope: CoroutineScope,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val timeProvider: () -> Long = { SystemClock.elapsedRealtime() },
     var isTransientPackage: (String) -> Boolean = { pkg ->

@@ -17,6 +17,7 @@ import org.junit.Test
 class FakeUsageStatsRepository : UsageStatsRepository {
     var hasPermission: Boolean = true
     val usageMap = mutableMapOf<String, Long>()
+    var activeForegroundPackage: String? = null
 
     override fun hasUsagePermission(): Boolean = hasPermission
 
@@ -27,6 +28,8 @@ class FakeUsageStatsRepository : UsageStatsRepository {
         val result = packageNames.associateWith { usageMap[it] ?: 0L }
         return Result.success(result)
     }
+
+    override fun getForegroundPackage(): String? = activeForegroundPackage
 }
 
 class RestrictedAppDetectionEngineTest {
