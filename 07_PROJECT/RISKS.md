@@ -3,9 +3,9 @@
   -------------------------------------------------------------------------------------------------------------------------
   ID          Risk            Impact      Likelihood   Mitigation                                       Status
   ----------- --------------- ----------- ------------ ------------------------------------------------ -------------------
-  R-001       Accessibility   Critical    Medium       `AccessibilityServiceHealthRepository` checks,   Open (Active POC-04)
-              Service                      `ACCESSIBILITY_INTERRUPTED` state detection,      
-              interrupted by               recovery UX, OEM background testing             
+  R-001       Accessibility   Critical    Medium       `ProtectionHealthRepository` state checks,       Mitigated in code
+              Service                      `ACCESSIBILITY_INTERRUPTED` state detection,     (Physical validation pending)
+              interrupted by               dashboard recovery UX (`ProtectionStatusCard`)   
               user/system/OEM                                                               
 
   R-002       OEM background  Critical    Medium       OEM device matrix testing (Xiaomi, Samsung,      Open
@@ -34,12 +34,12 @@
               sensitive                    guarantee (no screen/text/password collection)   
               permissions                                                                   
 
-  R-008       Blocking        Critical    Medium       Treat as release-blocking issue; physical device Open (Active POC-06)
-              failures                     testing                                          
+  R-008       Blocking        Critical    Low          Treat as release-blocking issue; physical device Mitigated (POC-06 Physical PASS)
+              failures                     validation confirmed on test hardware            
 
-  R-009       OEM service     High        Medium       Detect service unbind/destroy and transition to   Open (POC-04)
-              restart /                    `ACCESSIBILITY_NOT_GRANTED` state with user recovery
-              kill after                   path                                             
+  R-009       OEM service     High        Medium       Detect service unbind/destroy and transition to   Mitigated in code
+              restart /                    `ACCESSIBILITY_NOT_GRANTED` with direct recovery  (Physical validation pending)
+              kill after                   path in `MainScreen`                             
               memory pressure                                                               
 
   R-010       OEM background  High        Low          Configured `singleTask` launchMode,              Mitigated (POC-06 Follow-up 2)

@@ -16,7 +16,10 @@ sealed interface AppSelectionUiState {
      */
     data class Success(
         val apps: List<DiscoveredApp> = emptyList(),
-        val selectedCount: Int = apps.count { it.isSelected }
+        val selectedCount: Int = apps.count { it.isSelected },
+        val isCommitmentLocked: Boolean = false,
+        val lockedNotice: String? = null,
+        val pendingRemovalPackages: Set<String> = emptySet()
     ) : AppSelectionUiState
 
     /**

@@ -48,6 +48,25 @@
 15. Privacy Boundary: event processing accesses ONLY packageName string
 16. Health Repository: service health correctly reports active, unavailable, and interrupted states
 
+### Phase 4 Protection Health & Reliability Test Suite
+
+1.  Protection Health: both Usage Access granted and Accessibility active -> PROTECTED
+2.  Protection Health: Usage Access revoked while Accessibility active -> USAGE_ACCESS_REQUIRED
+3.  Protection Health: Usage Access granted while Accessibility disabled -> ACCESSIBILITY_REQUIRED
+4.  Protection Health: Usage Access granted while Accessibility interrupted -> ACCESSIBILITY_INTERRUPTED
+5.  Protection Health: both Usage Access and Accessibility disabled -> DEGRADED
+6.  Protection Health: dynamic state change when AccessibilityService connects/disconnects
+7.  Protection Health: refreshHealth re-queries runtime permissions and updates state
+8.  Midnight Boundary: trigger emitted on the current calendar day persists and reloads
+9.  Midnight Boundary: trigger emitted prior to midnight (yesterday) automatically expires on reload
+10. Midnight Boundary: checkAndExpireStaleTriggers() clears expired triggers across midnight boundary
+11. Main ViewModel: uiState reflects protection health and selected app count
+12. Main ViewModel: uiState reactively updates when protection health transitions
+13. Main ViewModel: openUsageAccessSettings and openAccessibilitySettings execute safely
+14. Main UI: renders PROTECTED banner with active app count when protection is active
+15. Main UI: renders USAGE_ACCESS_REQUIRED banner with one-tap recovery button when usage access revoked
+16. Main UI: renders ACCESSIBILITY_INTERRUPTED banner with re-enable recovery button when service interrupted
+
 ## Integration
 
 -   UsageStatsManager → Usage Engine
@@ -55,11 +74,13 @@
 -   AccessibilityEvent → RestrictedAppDetectionEngine → UsageRuleEngine → EnforcementTrigger
 -   SharedPreferencesSelectedAppsRepository & SharedPreferencesDailyLimitRepository persistence
 -   Permission & Service health checks
+-   ProtectionHealthRepository reactive synchronization
 
 ## UI
 
 -   MainScreen navigation to App Selection, Usage Tracking, and Accessibility Disclosure
 -   Prominent Disclosure UI displaying non-accessibility-tool disclosure and privacy guarantee
+-   ProtectionStatusCard displaying live health state with contextual one-tap recovery buttons
 -   Grant Accessibility Permission button opening system settings
 -   Internal EnforcementTrigger detection display indicator
 
@@ -71,9 +92,9 @@
 -   Reboot
 -   Background/foreground
 -   Midnight reset
--   Permission removal
--   Accessibility interruption
--   Usage Access removal
+-   Permission removal & restoration
+-   Accessibility interruption & rebind
+-   Usage Access removal & recovery
 -   Battery restrictions
 -   App/OS updates
 -   Date/time changes

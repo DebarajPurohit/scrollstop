@@ -49,4 +49,18 @@
     <string name="blocking_screen_subtitle">You\'ve reached your daily limit for %1$s.</string>
     <string name="blocking_screen_reset_info">Access will be available again after daily reset (midnight).</string>
     <string name="btn_go_to_dashboard">Go to Dashboard</string>
+
+    <!-- Protection Health & Recovery Strings (Phase 4 Milestone) -->
+    <string name="health_status_protected">PROTECTION ACTIVE</string>
+    <string name="health_status_usage_required">USAGE ACCESS REQUIRED</string>
+    <string name="health_status_accessibility_required">ACCESSIBILITY REQUIRED</string>
+    <string name="health_status_accessibility_interrupted">PROTECTION INTERRUPTED</string>
+    <string name="health_status_degraded">SETUP REQUIRED</string>
+    <string name="health_desc_protected">Enforcing daily limits for %1$d selected apps.</string>
+    <string name="health_desc_usage_required">Stop Doom Scroll cannot measure screen time without Usage Access.</string>
+    <string name="health_desc_accessibility_required">Stop Doom Scroll cannot stop restricted apps without Accessibility Service.</string>
+    <string name="health_desc_accessibility_interrupted">Detection service was paused by system or battery optimization.</string>
+    <string name="health_desc_degraded">Both Usage Access and Accessibility Service are needed to stop doom scrolling.</string>
+    <string name="btn_re_enable_protection">Re-enable Protection</string>
+    <string name="btn_enable_accessibility">Enable Accessibility</string>
 </resources>

@@ -25,8 +25,15 @@ class UsageViewModel(
     private val appDiscoveryRepository: AppDiscoveryRepository,
     private val selectedAppsRepository: SelectedAppsRepository,
     private val dailyLimitRepository: DailyLimitRepository = InMemoryDailyLimitRepository(),
-    private val usageRuleEngine: UsageRuleEngine = UsageRuleEngine()
+    private val usageRuleEngine: UsageRuleEngine = UsageRuleEngine(),
+    private val commitmentLockRepository: com.scrollstop.data.repository.CommitmentLockRepository? = null,
+    private val commitmentRuleEngine: com.scrollstop.domain.rules.CommitmentRuleEngine = com.scrollstop.domain.rules.CommitmentRuleEngine()
 ) : ViewModel() {
+
+    sealed interface LimitChangeResult {
+        data object AppliedImmediately : LimitChangeResult
+        data class DeferredToMidnight(val targetLimitMs: Long) : LimitChangeResult
+    }
 
     private val _uiState = MutableStateFlow<UsageUiState>(UsageUiState.Loading)
     val uiState: StateFlow<UsageUiState> = _uiState.asStateFlow()
@@ -37,10 +44,26 @@ class UsageViewModel(
 
     /**
      * Configures a daily limit in milliseconds for a package and refreshes usage evaluation.
+     * When Commitment Lock is active:
+     * - Reducing or matching limit takes effect immediately (tightening).
+     * - Increasing limit is deferred until next midnight reset (relaxation).
      */
-    fun setDailyLimit(packageName: String, limitMs: Long) {
-        dailyLimitRepository.setLimitForPackage(packageName, limitMs)
-        refreshUsage()
+    fun setDailyLimit(packageName: String, limitMs: Long): LimitChangeResult {
+        val currentLimit = dailyLimitRepository.getLimitForPackage(packageName)
+        val commitmentState = commitmentLockRepository?.commitmentState?.value ?: com.scrollstop.domain.model.CommitmentLockState()
+
+        return if (commitmentRuleEngine.canChangeLimitImmediately(currentLimit, limitMs, commitmentState)) {
+            dailyLimitRepository.setLimitForPackage(packageName, limitMs)
+            if (commitmentState.pendingIncreasedLimits.containsKey(packageName)) {
+                commitmentLockRepository?.cancelStagedLimitIncrease(packageName)
+            }
+            refreshUsage()
+            LimitChangeResult.AppliedImmediately
+        } else {
+            commitmentLockRepository?.stageLimitIncrease(packageName, limitMs)
+            refreshUsage()
+            LimitChangeResult.DeferredToMidnight(limitMs)
+        }
     }
 
     /**
@@ -101,7 +124,11 @@ class UsageViewModel(
                         // Sort deterministically by label
                         .sortedBy { it.appLabel.lowercase() }
 
-                    _uiState.value = UsageUiState.Success(usageList = usageList)
+                    val pendingLimits = commitmentLockRepository?.commitmentState?.value?.pendingIncreasedLimits ?: emptyMap()
+                    _uiState.value = UsageUiState.Success(
+                        usageList = usageList,
+                        pendingIncreasedLimits = pendingLimits
+                    )
                 }
                 .onFailure { exception ->
                     if (exception is SecurityException) {

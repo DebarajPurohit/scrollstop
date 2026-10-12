@@ -167,3 +167,43 @@ password/security credentials.\
    - Updated `onForegroundPackageChanged` so that null or blank package events arriving while an app is being monitored (`currentMonitoredPackage != null`) are ignored as transient internal framework transitions rather than cancelling the active monitoring coroutine.
    - Expanded `ImePackageDetector` to recognize Google Play Services autofill (`com.google.android.gms`), search box dialogs, and password managers as transient windows.
 **Reason:** Resolves physical device failure where an app exceeding its daily limit while the keyboard was open delayed presentation of the blocking screen until the keyboard was manually dismissed.
+
+### TD-016 --- Unified Protection Health Repository, Recovery UX, & Midnight Trigger Boundary Handling (Phase 4 Reliability Milestone)
+
+**Status:** Approved (Phase 4 Milestone)
+**Decision:**
+1. Unified Protection Health Architecture:
+   - Implement `ProtectionHealthRepository` (`AndroidProtectionHealthRepository`) synthesizing both Usage Access permission (`UsageStatsRepository.hasUsagePermission()`) and AccessibilityService connectivity (`AccessibilityServiceHealthRepository.serviceState`) into a single observable `StateFlow<ProtectionHealthState>` (`PROTECTED`, `USAGE_ACCESS_REQUIRED`, `ACCESSIBILITY_REQUIRED`, `ACCESSIBILITY_INTERRUPTED`, `DEGRADED`).
+   - Observe accessibility service changes reactively and refresh synchronously on demand.
+2. Dashboard Recovery UX:
+   - Embed `ProtectionStatusCard` on `MainScreen` presenting real-time protection health status and direct one-tap recovery buttons (`Settings.ACTION_USAGE_ACCESS_SETTINGS` and `Settings.ACTION_ACCESSIBILITY_SETTINGS`) whenever protection is paused or degraded.
+   - Attach lifecycle observer (`Lifecycle.Event.ON_RESUME`) in `AppNavigation` to automatically refresh health and re-evaluate protection state as soon as the user returns from Android Settings.
+3. Daily Midnight Boundary & Stale Trigger Expiration:
+   - In `SharedPreferencesEnforcementTriggerRepository`, persist wall-clock timestamp (`trigger_wall_clock_time_ms`) alongside monotonic elapsedRealtime.
+   - Validate stored triggers against `timeProvider.getStartOfDayMillis()`. Any trigger recorded prior to the start of the current calendar day is expired and cleared automatically, guaranteeing that users are never blocked on a new day based on yesterday's usage.
+**Reason:** Closes core reliability gaps where permission revocation, service interruption, or midnight calendar boundaries could leave users without observable protection health status, recovery pathways, or clean daily limit resets.
+
+### TD-017 --- Commitment Lock Persistence, Deterministic Time Seam, and Usage Access Failure Handling (Commitment Lock MVP)
+
+**Status:** Approved (Commitment Lock MVP)
+**Decision:**
+1. Pure Domain Rule Evaluation:
+   - Implement `CommitmentRuleEngine` as a pure, deterministic Kotlin engine to govern limit tightening (immediate), relaxation staging (deferred to midnight), and midnight boundary evaluations.
+2. Local SharedPreferences Persistence:
+   - Implement `SharedPreferencesCommitmentLockRepository` persisting `is_locked`, `locked_at_ms`, `pending_unlock`, `pending_unlock_target_midnight_ms`, `pending_removed_packages`, and `pending_increased_limits` JSON map.
+   - Survives process death, app restarts, and system reboots.
+   - Evaluates transitions on demand when the app resumes (`Lifecycle.Event.ON_RESUME`) or refreshes protection state.
+3. Deterministic Test Time Seam:
+   - Extend `TimeProvider` interface with `getNextMidnightMillis(): Long`, calculating next local calendar midnight.
+   - Allows deterministic unit testing of midnight transitions and day boundary calculations without changing the physical device clock.
+4. Developer-Only Safe Test Reset:
+   - Implement `debugClearCommitmentState()` in `CommitmentLockRepository`.
+   - Surface `[DEBUG TEST] Reset Commitment Lock` button on `MainScreen` strictly guarded by `com.scrollstop.BuildConfig.DEBUG`.
+   - In production / release builds, `BuildConfig.DEBUG` evaluates to `false` and the compiler/R8 strips the UI action entirely.
+5. Usage Access Reliability Gap Resolution:
+   - In `RestrictedAppDetectionEngine` and `LiveLimitEnforcementEngine`, explicitly inspect `usageResult.isFailure`.
+   - Never assume missing or failed usage queries equal zero usage (`0L`).
+   - Query failures abort/stop monitoring loops cleanly, log `USAGE_QUERY_FAILED` / `LIVE_USAGE_QUERY_FAILED`, and allow `ProtectionHealthRepository` to surface `USAGE_ACCESS_REQUIRED`.
+   - Monitoring resumes cleanly once permission is restored without corrupting user data or fabricating usage numbers.
+**Reason:** Ensures physical test safety, rock-solid persistence across device restarts, and deterministic compliance with Google Play and Android platform guidelines.
+

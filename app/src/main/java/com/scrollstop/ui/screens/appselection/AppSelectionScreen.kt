@@ -129,6 +129,9 @@ fun AppSelectionScreen(
                             AppListView(
                                 apps = uiState.apps,
                                 selectedCount = uiState.selectedCount,
+                                isCommitmentLocked = uiState.isCommitmentLocked,
+                                lockedNotice = uiState.lockedNotice,
+                                pendingRemovalPackages = uiState.pendingRemovalPackages,
                                 onToggleAppSelection = onToggleAppSelection
                             )
                         }
@@ -244,9 +247,49 @@ private fun EmptyStateView(onRetry: () -> Unit) {
 private fun AppListView(
     apps: List<DiscoveredApp>,
     selectedCount: Int,
+    isCommitmentLocked: Boolean,
+    lockedNotice: String?,
+    pendingRemovalPackages: Set<String>,
     onToggleAppSelection: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
+        if (isCommitmentLocked) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                )
+            ) {
+                Text(
+                    text = "🔒 Commitment Lock Active: Adding apps applies immediately. Removing apps is deferred to next midnight.",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+        }
+
+        if (!lockedNotice.isNullOrBlank()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                )
+            ) {
+                Text(
+                    text = lockedNotice,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+        }
+
         // Selection counter banner
         Text(
             text = stringResource(id = R.string.selected_apps_count, selectedCount),
@@ -267,6 +310,7 @@ private fun AppListView(
             ) { app ->
                 AppItemRow(
                     app = app,
+                    isPendingRemoval = pendingRemovalPackages.contains(app.packageName),
                     onToggleSelection = { onToggleAppSelection(app.packageName) }
                 )
             }
@@ -277,6 +321,7 @@ private fun AppListView(
 @Composable
 private fun AppItemRow(
     app: DiscoveredApp,
+    isPendingRemoval: Boolean = false,
     onToggleSelection: () -> Unit
 ) {
     val selectionDescription = if (app.isSelected) "Selected" else "Not selected"
@@ -335,6 +380,14 @@ private fun AppItemRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (isPendingRemoval) {
+                    Text(
+                        text = "Removal scheduled at midnight",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(8.dp))

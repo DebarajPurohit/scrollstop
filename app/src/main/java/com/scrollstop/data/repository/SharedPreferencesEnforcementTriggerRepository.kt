@@ -3,6 +3,8 @@ package com.scrollstop.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.scrollstop.data.time.SystemTimeProvider
+import com.scrollstop.data.time.TimeProvider
 import com.scrollstop.domain.model.EnforcementTrigger
 import com.scrollstop.domain.rules.LimitState
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -17,10 +19,15 @@ import kotlinx.coroutines.flow.asStateFlow
  *
  * Ensures emitted [EnforcementTrigger] state and diagnostic event trace persist across
  * background service events, process restarts, activity backgrounding, and screen recreation.
+ *
+ * Midnight Boundary Handling:
+ * Evaluates triggers against [timeProvider.getStartOfDayMillis()]. If a persisted trigger was emitted
+ * on a previous calendar day, it is automatically cleared to respect the daily midnight limit reset.
  */
 class SharedPreferencesEnforcementTriggerRepository(
     context: Context,
-    prefName: String = PREF_NAME
+    prefName: String = PREF_NAME,
+    private val timeProvider: TimeProvider = SystemTimeProvider()
 ) : EnforcementTriggerRepository {
 
     companion object {
@@ -28,6 +35,7 @@ class SharedPreferencesEnforcementTriggerRepository(
         private const val KEY_PACKAGE_NAME = "trigger_package_name"
         private const val KEY_REASON = "trigger_reason"
         private const val KEY_TIMESTAMP_MS = "trigger_timestamp_ms"
+        private const val KEY_WALL_CLOCK_TIME_MS = "trigger_wall_clock_time_ms"
 
         private const val KEY_DIAG_EVENT_PKG = "diag_event_pkg"
         private const val KEY_DIAG_DETECTION_PKG = "diag_detection_pkg"
@@ -70,6 +78,18 @@ class SharedPreferencesEnforcementTriggerRepository(
     private fun readTriggerFromPrefs(): EnforcementTrigger? {
         val packageName = prefs.getString(KEY_PACKAGE_NAME, null) ?: return null
         if (packageName.isBlank()) return null
+
+        val wallClockTime = prefs.getLong(KEY_WALL_CLOCK_TIME_MS, 0L)
+        // If the trigger was recorded prior to start of today, it has expired on midnight boundary
+        if (wallClockTime > 0L && wallClockTime < timeProvider.getStartOfDayMillis()) {
+            prefs.edit()
+                .remove(KEY_PACKAGE_NAME)
+                .remove(KEY_REASON)
+                .remove(KEY_TIMESTAMP_MS)
+                .remove(KEY_WALL_CLOCK_TIME_MS)
+                .apply()
+            return null
+        }
 
         val reasonStr = prefs.getString(KEY_REASON, LimitState.LIMIT_REACHED.name)
         val reason = try {
@@ -139,13 +159,15 @@ class SharedPreferencesEnforcementTriggerRepository(
     }
 
     override fun emitTrigger(trigger: EnforcementTrigger) {
+        val nowWallClock = timeProvider.currentTimeMillis()
         prefs.edit()
             .putString(KEY_PACKAGE_NAME, trigger.packageName)
             .putString(KEY_REASON, trigger.reason.name)
             .putLong(KEY_TIMESTAMP_MS, trigger.detectedAtElapsedRealtimeMs)
+            .putLong(KEY_WALL_CLOCK_TIME_MS, nowWallClock)
             .apply()
 
-        safeLogD(TAG, "TRIGGER_PERSISTED package=${trigger.packageName}")
+        safeLogD(TAG, "TRIGGER_PERSISTED package=${trigger.packageName} wallClock=$nowWallClock")
 
         _latestTrigger.value = trigger
         _triggerFlow.tryEmit(trigger)
@@ -156,11 +178,20 @@ class SharedPreferencesEnforcementTriggerRepository(
             .remove(KEY_PACKAGE_NAME)
             .remove(KEY_REASON)
             .remove(KEY_TIMESTAMP_MS)
+            .remove(KEY_WALL_CLOCK_TIME_MS)
             .apply()
 
         safeLogD(TAG, "TRIGGER_CLEARED")
 
         _latestTrigger.value = null
+    }
+
+    override fun checkAndExpireStaleTriggers() {
+        val wallClockTime = prefs.getLong(KEY_WALL_CLOCK_TIME_MS, 0L)
+        if (wallClockTime > 0L && wallClockTime < timeProvider.getStartOfDayMillis()) {
+            safeLogD(TAG, "TRIGGER_EXPIRED_MIDNIGHT wallClock=$wallClockTime midnight=${timeProvider.getStartOfDayMillis()}")
+            clearLatestTrigger()
+        }
     }
 
     override fun recordEvent(packageName: String) {

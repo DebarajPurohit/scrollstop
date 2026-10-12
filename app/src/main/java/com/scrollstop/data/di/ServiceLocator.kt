@@ -3,10 +3,12 @@ package com.scrollstop.data.di
 import android.content.Context
 import com.scrollstop.data.repository.AccessibilityServiceHealthRepository
 import com.scrollstop.data.repository.AndroidAccessibilityServiceHealthRepository
+import com.scrollstop.data.repository.AndroidProtectionHealthRepository
 import com.scrollstop.data.repository.AndroidUsageStatsRepository
 import com.scrollstop.data.repository.DailyLimitRepository
 import com.scrollstop.data.repository.EnforcementTriggerRepository
 import com.scrollstop.data.repository.InMemoryEnforcementTriggerRepository
+import com.scrollstop.data.repository.ProtectionHealthRepository
 import com.scrollstop.data.repository.SelectedAppsRepository
 import com.scrollstop.data.repository.SharedPreferencesDailyLimitRepository
 import com.scrollstop.data.repository.SharedPreferencesEnforcementTriggerRepository
@@ -34,6 +36,9 @@ object ServiceLocator {
 
     @Volatile
     private var accessibilityHealthRepository: AccessibilityServiceHealthRepository? = null
+
+    @Volatile
+    private var protectionHealthRepository: ProtectionHealthRepository? = null
 
     @Volatile
     private var usageRuleEngine: UsageRuleEngine? = null
@@ -83,6 +88,17 @@ object ServiceLocator {
         return accessibilityHealthRepository ?: synchronized(this) {
             accessibilityHealthRepository ?: AndroidAccessibilityServiceHealthRepository().also {
                 accessibilityHealthRepository = it
+            }
+        }
+    }
+
+    fun getProtectionHealthRepository(context: Context): ProtectionHealthRepository {
+        return protectionHealthRepository ?: synchronized(this) {
+            protectionHealthRepository ?: AndroidProtectionHealthRepository(
+                usageStatsRepository = getUsageStatsRepository(context),
+                accessibilityHealthRepository = getAccessibilityHealthRepository()
+            ).also {
+                protectionHealthRepository = it
             }
         }
     }
@@ -147,21 +163,54 @@ object ServiceLocator {
         }
     }
 
+    @Volatile
+    private var commitmentLockRepository: com.scrollstop.data.repository.CommitmentLockRepository? = null
+
+    @Volatile
+    private var commitmentRuleEngine: com.scrollstop.domain.rules.CommitmentRuleEngine? = null
+
+    fun getCommitmentRuleEngine(): com.scrollstop.domain.rules.CommitmentRuleEngine {
+        return commitmentRuleEngine ?: synchronized(this) {
+            commitmentRuleEngine ?: com.scrollstop.domain.rules.CommitmentRuleEngine().also {
+                commitmentRuleEngine = it
+            }
+        }
+    }
+
+    fun getCommitmentLockRepository(context: Context): com.scrollstop.data.repository.CommitmentLockRepository {
+        return commitmentLockRepository ?: synchronized(this) {
+            commitmentLockRepository ?: com.scrollstop.data.repository.SharedPreferencesCommitmentLockRepository(
+                context = context.applicationContext,
+                selectedAppsRepository = getSelectedAppsRepository(context),
+                dailyLimitRepository = getDailyLimitRepository(context),
+                commitmentRuleEngine = getCommitmentRuleEngine()
+            ).also {
+                commitmentLockRepository = it
+            }
+        }
+    }
+
     fun resetForTesting(
         selectedAppsRepo: SelectedAppsRepository? = null,
         dailyLimitRepo: DailyLimitRepository? = null,
         usageStatsRepo: UsageStatsRepository? = null,
         triggerRepo: EnforcementTriggerRepository? = null,
         healthRepo: AccessibilityServiceHealthRepository? = null,
+        protectionHealthRepo: ProtectionHealthRepository? = null,
         ruleEngine: UsageRuleEngine? = null,
-        liveEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine? = null
+        liveEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine? = null,
+        commitmentLockRepo: com.scrollstop.data.repository.CommitmentLockRepository? = null,
+        commitmentRules: com.scrollstop.domain.rules.CommitmentRuleEngine? = null
     ) {
         selectedAppsRepository = selectedAppsRepo
         dailyLimitRepository = dailyLimitRepo
         usageStatsRepository = usageStatsRepo
         enforcementTriggerRepository = triggerRepo
         accessibilityHealthRepository = healthRepo
+        protectionHealthRepository = protectionHealthRepo
         usageRuleEngine = ruleEngine
         liveLimitEnforcementEngine = liveEngine
+        commitmentLockRepository = commitmentLockRepo
+        commitmentRuleEngine = commitmentRules
     }
 }

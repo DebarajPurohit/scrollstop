@@ -10,6 +10,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +39,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
@@ -65,6 +69,7 @@ fun UsageScreen(
     onRefresh: () -> Unit,
     onNavigateToAppSelection: () -> Unit,
     onNavigateBack: () -> Unit,
+    onSetDailyLimit: ((String, Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -152,7 +157,9 @@ fun UsageScreen(
                     }
                     is UsageUiState.Success -> {
                         UsageListView(
-                            usageList = uiState.usageList
+                            usageList = uiState.usageList,
+                            pendingIncreasedLimits = uiState.pendingIncreasedLimits,
+                            onSetDailyLimit = onSetDailyLimit
                         )
                     }
                 }
@@ -301,8 +308,24 @@ private fun ErrorUsageView(errorMessage: String, onRetry: () -> Unit) {
 
 @Composable
 private fun UsageListView(
-    usageList: List<AppUsageInfo>
+    usageList: List<AppUsageInfo>,
+    pendingIncreasedLimits: Map<String, Long> = emptyMap(),
+    onSetDailyLimit: ((String, Long) -> Unit)? = null
 ) {
+    var selectedPackageForEdit by remember { mutableStateOf<AppUsageInfo?>(null) }
+
+    if (selectedPackageForEdit != null) {
+        val app = selectedPackageForEdit!!
+        EditLimitDialog(
+            appInfo = app,
+            onDismiss = { selectedPackageForEdit = null },
+            onConfirmLimit = { newLimitMs ->
+                onSetDailyLimit?.invoke(app.packageName, newLimitMs)
+                selectedPackageForEdit = null
+            }
+        )
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -311,18 +334,85 @@ private fun UsageListView(
             items = usageList,
             key = { it.packageName }
         ) { item ->
-            UsageItemRow(item = item)
+            UsageItemRow(
+                item = item,
+                pendingLimitMs = pendingIncreasedLimits[item.packageName],
+                onEditClick = if (onSetDailyLimit != null) {
+                    { selectedPackageForEdit = item }
+                } else null
+            )
         }
     }
 }
 
 @Composable
-private fun UsageItemRow(item: AppUsageInfo) {
+private fun EditLimitDialog(
+    appInfo: AppUsageInfo,
+    onDismiss: () -> Unit,
+    onConfirmLimit: (Long) -> Unit
+) {
+    val presets = listOf(
+        2 * 60 * 1000L to "2 min (POC)",
+        5 * 60 * 1000L to "5 min",
+        15 * 60 * 1000L to "15 min",
+        30 * 60 * 1000L to "30 min",
+        45 * 60 * 1000L to "45 min",
+        60 * 60 * 1000L to "1 hour"
+    )
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Set Daily Limit: ${appInfo.appLabel}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Current limit: ${appInfo.formattedLimit}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Choose new limit allowance. Note: Tightening limits applies immediately; increasing limits while Commitment Lock is active is deferred until midnight.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                presets.forEach { (durationMs, label) ->
+                    OutlinedButton(
+                        onClick = { onConfirmLimit(durationMs) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = label)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text(text = "Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun UsageItemRow(
+    item: AppUsageInfo,
+    pendingLimitMs: Long? = null,
+    onEditClick: (() -> Unit)? = null
+) {
     val usageDescription = "${item.appLabel}, ${item.packageName}, Today's usage: ${item.formattedUsage}, Limit: ${item.formattedLimit}, Remaining: ${item.formattedRemaining}"
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .then(if (onEditClick != null) Modifier.clickable { onEditClick() } else Modifier)
             .semantics(mergeDescendants = true) {
                 contentDescription = usageDescription
             },
@@ -362,6 +452,15 @@ private fun UsageItemRow(item: AppUsageInfo) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (pendingLimitMs != null) {
+                    Text(
+                        text = "Increase pending: ${com.scrollstop.domain.util.UsageFormatter.formatDuration(pendingLimitMs)} at midnight",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))

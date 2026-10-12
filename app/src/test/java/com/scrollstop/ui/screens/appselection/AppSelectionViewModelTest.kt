@@ -1,6 +1,8 @@
 package com.scrollstop.ui.screens.appselection
 
+import com.scrollstop.FakeCommitmentLockRepository
 import com.scrollstop.data.repository.AppDiscoveryRepository
+import com.scrollstop.data.repository.InMemorySelectedAppsRepository
 import com.scrollstop.domain.model.DiscoveredApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,6 +13,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -85,6 +89,68 @@ class AppSelectionViewModelTest {
         val state = viewModel.uiState.value
         assertTrue(state is AppSelectionUiState.Error)
         assertEquals("Discovery failed", (state as AppSelectionUiState.Error).errorMessage)
+    }
+
+    @Test
+    fun `when commitment locked - adding app is permitted immediately`() = runTest {
+        val fakeApps = listOf(
+            DiscoveredApp("com.social.app", "Social App"),
+            DiscoveredApp("com.video.app", "Video App")
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        val commitmentRepo = FakeCommitmentLockRepository()
+        commitmentRepo.enableCommitmentLock(consentConfirmed = true)
+
+        val viewModel = AppSelectionViewModel(
+            repository = FakeAppDiscoveryRepository(Result.success(fakeApps)),
+            selectedAppsRepository = selectedRepo,
+            commitmentLockRepository = commitmentRepo
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Add app
+        viewModel.toggleAppSelection("com.social.app")
+        val state = viewModel.uiState.value as AppSelectionUiState.Success
+        assertTrue(state.isCommitmentLocked)
+        assertEquals(1, state.selectedCount)
+        assertTrue(state.apps.first { it.packageName == "com.social.app" }.isSelected)
+        assertNull(state.lockedNotice)
+    }
+
+    @Test
+    fun `when commitment locked - removing app is blocked and staged for midnight`() = runTest {
+        val fakeApps = listOf(
+            DiscoveredApp("com.social.app", "Social App"),
+            DiscoveredApp("com.video.app", "Video App")
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.social.app"))
+
+        val commitmentRepo = FakeCommitmentLockRepository()
+        commitmentRepo.enableCommitmentLock(consentConfirmed = true)
+
+        val viewModel = AppSelectionViewModel(
+            repository = FakeAppDiscoveryRepository(Result.success(fakeApps)),
+            selectedAppsRepository = selectedRepo,
+            commitmentLockRepository = commitmentRepo
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Attempt to remove com.social.app while locked
+        viewModel.toggleAppSelection("com.social.app")
+
+        val state = viewModel.uiState.value as AppSelectionUiState.Success
+        // App is still selected!
+        assertTrue(selectedRepo.isSelected("com.social.app"))
+        assertTrue(state.apps.first { it.packageName == "com.social.app" }.isSelected)
+        // Staged for removal
+        assertTrue(state.pendingRemovalPackages.contains("com.social.app"))
+        assertNotNull(state.lockedNotice)
+
+        // Toggling again cancels scheduled removal
+        viewModel.toggleAppSelection("com.social.app")
+        val stateAfterCancel = viewModel.uiState.value as AppSelectionUiState.Success
+        assertFalse(stateAfterCancel.pendingRemovalPackages.contains("com.social.app"))
     }
 
     private class FakeAppDiscoveryRepository(

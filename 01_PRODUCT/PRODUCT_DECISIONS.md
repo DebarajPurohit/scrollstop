@@ -53,6 +53,17 @@ validation phase.\
 **Decision:** When a selected restricted app is opened below its daily limit and remains continuously in the foreground, `RestrictedAppAccessibilityService` starts a lifecycle-safe live monitoring loop via `LiveLimitEnforcementEngine` that re-evaluates authoritative `UsageStatsManager` usage against `UsageRuleEngine` every 5 seconds. When the accumulated usage crosses the daily limit, `EnforcementTrigger` is emitted, triggering `BlockingScreen` without requiring the user to leave or reopen the app.
 **Reason:** Resolves physical test limitation where continuous foreground app usage was not blocked until a subsequent window transition. Establishes live limit-crossing enforcement while preserving `UsageStatsManager` as the sole authority and avoiding high-frequency polling.
 
+### PD-009 --- Commitment Lock MVP Behavior & Midnight Relaxation Schedule
+
+**Status:** Approved (Commitment Lock MVP)
+**Decision:** Implement Commitment Lock globally across all restricted applications:
+- Enabling requires affirmative user consent with an explicit confirmation dialog explaining that relaxing restrictions requires waiting until the next local calendar midnight reset.
+- Tightening restrictions (reducing daily limits or adding newly selected apps) takes effect immediately.
+- Relaxing restrictions (increasing daily limits, unselecting protected apps, or requesting commitment unlock) is deferred until the next local calendar midnight reset.
+- Local midnight resets daily usage metrics, NOT the commitment itself. The commitment remains active across days until explicitly requested to unlock and the target midnight has arrived.
+- Staged relaxation requests and commitment status persist across app restarts, process termination, and device reboots.
+- 1-hour cooling-off timer option is deferred from MVP to preserve clean, uncompromised commitment boundaries.
+
 ### Change Log
 
   Date         Change                       Reason
@@ -62,3 +73,5 @@ validation phase.\
   2026-09-29   Recorded PD-006              POC-04 AccessibilityService narrow trigger
   2026-10-08   Recorded PD-007              POC-05 Blocking UI & Enforcement Loop
   2026-10-08   Recorded PD-008              POC-05A Live Limit-Crossing Enforcement
+  2026-10-11   Recorded PD-009              Commitment Lock MVP & Midnight Relaxation Schedule
+

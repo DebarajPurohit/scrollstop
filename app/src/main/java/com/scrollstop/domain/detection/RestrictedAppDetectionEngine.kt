@@ -80,6 +80,10 @@ class RestrictedAppDetectionEngine(
 
         // 5. Retrieve usage stats for the detected package
         val usageResult = usageStatsRepository.getTodayUsageForPackages(setOf(pkg))
+        if (usageResult.isFailure) {
+            safeLogD(TAG, "USAGE_QUERY_FAILED package=$pkg error=${usageResult.exceptionOrNull()?.message}")
+            return null
+        }
         val usedMs = usageResult.getOrNull()?.get(pkg) ?: 0L
 
         // 6. Retrieve configured limit for the package

@@ -255,9 +255,11 @@ class AndroidUsageStatsRepositoryTest {
 
     private class FakeTimeProvider(
         var currentTime: Long,
-        var startOfDay: Long
+        var startOfDay: Long,
+        var nextMidnight: Long = startOfDay + 86_400_000L
     ) : TimeProvider {
         override fun currentTimeMillis(): Long = currentTime
         override fun getStartOfDayMillis(): Long = startOfDay
+        override fun getNextMidnightMillis(): Long = nextMidnight
     }
 }

@@ -1,6 +1,8 @@
 package com.scrollstop.ui.screens.usage
 
+import com.scrollstop.FakeCommitmentLockRepository
 import com.scrollstop.data.repository.AppDiscoveryRepository
+import com.scrollstop.data.repository.InMemoryDailyLimitRepository
 import com.scrollstop.data.repository.InMemorySelectedAppsRepository
 import com.scrollstop.data.repository.SelectedAppsRepository
 import com.scrollstop.data.repository.UsageStatsRepository
@@ -208,6 +210,89 @@ class UsageViewModelTest {
         assertEquals(120_000L, item.limitDurationMs)
         assertEquals(120_000L - rawUsageMs, item.remainingDurationMs)
         assertEquals(com.scrollstop.domain.rules.LimitState.WITHIN_LIMIT, item.limitState)
+    }
+
+    @Test
+    fun `when not locked - limit changes apply immediately`() {
+        val usageRepo = FakeUsageStatsRepository(hasPermission = true)
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(DiscoveredApp("com.google.android.youtube", "YouTube"))
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.google.android.youtube"))
+        val limitRepo = InMemoryDailyLimitRepository(defaultLimitMs = 120_000L)
+
+        val viewModel = UsageViewModel(
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = discoveryRepo,
+            selectedAppsRepository = selectedRepo,
+            dailyLimitRepository = limitRepo
+        )
+
+        // Increase limit from 120s to 300s
+        val result = viewModel.setDailyLimit("com.google.android.youtube", 300_000L)
+        assertEquals(UsageViewModel.LimitChangeResult.AppliedImmediately, result)
+        assertEquals(300_000L, limitRepo.getLimitForPackage("com.google.android.youtube"))
+    }
+
+    @Test
+    fun `when locked - tightening limit applies immediately`() {
+        val usageRepo = FakeUsageStatsRepository(hasPermission = true)
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(DiscoveredApp("com.google.android.youtube", "YouTube"))
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.google.android.youtube"))
+        val limitRepo = InMemoryDailyLimitRepository(defaultLimitMs = 120_000L)
+        val commitmentRepo = FakeCommitmentLockRepository()
+        commitmentRepo.enableCommitmentLock(consentConfirmed = true)
+
+        val viewModel = UsageViewModel(
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = discoveryRepo,
+            selectedAppsRepository = selectedRepo,
+            dailyLimitRepository = limitRepo,
+            commitmentLockRepository = commitmentRepo
+        )
+
+        // Tighten limit from 120s to 60s
+        val result = viewModel.setDailyLimit("com.google.android.youtube", 60_000L)
+        assertEquals(UsageViewModel.LimitChangeResult.AppliedImmediately, result)
+        assertEquals(60_000L, limitRepo.getLimitForPackage("com.google.android.youtube"))
+    }
+
+    @Test
+    fun `when locked - relaxing limit is deferred to midnight and staged`() {
+        val usageRepo = FakeUsageStatsRepository(hasPermission = true)
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(DiscoveredApp("com.google.android.youtube", "YouTube"))
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.google.android.youtube"))
+        val limitRepo = InMemoryDailyLimitRepository(defaultLimitMs = 120_000L)
+        val commitmentRepo = FakeCommitmentLockRepository()
+        commitmentRepo.enableCommitmentLock(consentConfirmed = true)
+
+        val viewModel = UsageViewModel(
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = discoveryRepo,
+            selectedAppsRepository = selectedRepo,
+            dailyLimitRepository = limitRepo,
+            commitmentLockRepository = commitmentRepo
+        )
+
+        // Relax limit from 120s to 300s
+        val result = viewModel.setDailyLimit("com.google.android.youtube", 300_000L)
+        assertEquals(UsageViewModel.LimitChangeResult.DeferredToMidnight(300_000L), result)
+
+        // Current limit remains unchanged
+        assertEquals(120_000L, limitRepo.getLimitForPackage("com.google.android.youtube"))
+        // Staged in commitment repo
+        assertEquals(300_000L, commitmentRepo.commitmentState.value.pendingIncreasedLimits["com.google.android.youtube"])
+
+        // UI state contains pending increased limit
+        val state = viewModel.uiState.value as UsageUiState.Success
+        assertEquals(300_000L, state.pendingIncreasedLimits["com.google.android.youtube"])
     }
 
 

@@ -124,6 +124,11 @@ class LiveLimitEnforcementEngine(
 
             // Immediate check (POC-05 behavior for already-over-limit apps)
             val usageResult = usageStatsRepository.getTodayUsageForPackages(setOf(pkg))
+            if (usageResult.isFailure) {
+                safeLogD(TAG, "LIVE_USAGE_QUERY_FAILED package=$pkg error=${usageResult.exceptionOrNull()?.message}")
+                stopMonitoringLocked()
+                return@synchronized
+            }
             val usedMs = usageResult.getOrNull()?.get(pkg) ?: 0L
             val limitMs = dailyLimitRepository.getLimitForPackage(pkg)
             val evaluation = usageRuleEngine.evaluate(pkg, usedMs, limitMs)
@@ -184,6 +189,11 @@ class LiveLimitEnforcementEngine(
 
                     // Query authoritative UsageStatsManager
                     val usageResult = usageStatsRepository.getTodayUsageForPackages(setOf(pkg))
+                    if (usageResult.isFailure) {
+                        safeLogD(TAG, "LIVE_POLL_USAGE_QUERY_FAILED package=$pkg error=${usageResult.exceptionOrNull()?.message}")
+                        stopMonitoringLocked()
+                        return@launch
+                    }
                     val currentUsageMs = usageResult.getOrNull()?.get(pkg) ?: 0L
                     val currentLimitMs = dailyLimitRepository.getLimitForPackage(pkg)
                     val evaluation = usageRuleEngine.evaluate(pkg, currentUsageMs, currentLimitMs)

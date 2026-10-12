@@ -43,6 +43,7 @@ interface EnforcementTriggerRepository {
 
     fun emitTrigger(trigger: EnforcementTrigger)
     fun clearLatestTrigger()
+    fun checkAndExpireStaleTriggers()
 
     fun recordEvent(packageName: String)
     fun recordDetection(packageName: String, isSelected: Boolean)
@@ -81,6 +82,10 @@ class InMemoryEnforcementTriggerRepository : EnforcementTriggerRepository {
 
     override fun clearLatestTrigger() {
         _latestTrigger.value = null
+    }
+
+    override fun checkAndExpireStaleTriggers() {
+        // No-op for in-memory implementation
     }
 
     override fun recordEvent(packageName: String) {

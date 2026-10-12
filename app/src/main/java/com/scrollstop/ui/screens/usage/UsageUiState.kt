@@ -20,7 +20,8 @@ sealed interface UsageUiState {
      * @property usageList List of [AppUsageInfo] for selected apps.
      */
     data class Success(
-        val usageList: List<AppUsageInfo> = emptyList()
+        val usageList: List<AppUsageInfo> = emptyList(),
+        val pendingIncreasedLimits: Map<String, Long> = emptyMap()
     ) : UsageUiState
 
     /**
