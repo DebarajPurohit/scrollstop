@@ -3,8 +3,8 @@
   -------------------------------------------------------------------------------------------------------------------------
   ID          Risk            Impact      Likelihood   Mitigation                                       Status
   ----------- --------------- ----------- ------------ ------------------------------------------------ -------------------
-  R-001       Accessibility   Critical    Medium       `ProtectionHealthRepository` state checks,       Mitigated in code
-              Service                      `ACCESSIBILITY_INTERRUPTED` state detection,     (Physical validation pending)
+  R-001       Accessibility   Critical    Medium       `ProtectionHealthRepository` state checks,       Mitigated on test hardware
+              Service                      `ACCESSIBILITY_INTERRUPTED` state detection,     (Multi-OEM validation pending)
               interrupted by               dashboard recovery UX (`ProtectionStatusCard`)   
               user/system/OEM                                                               
 
@@ -37,8 +37,8 @@
   R-008       Blocking        Critical    Low          Treat as release-blocking issue; physical device Mitigated (POC-06 Physical PASS)
               failures                     validation confirmed on test hardware            
 
-  R-009       OEM service     High        Medium       Detect service unbind/destroy and transition to   Mitigated in code
-              restart /                    `ACCESSIBILITY_NOT_GRANTED` with direct recovery  (Physical validation pending)
+  R-009       OEM service     High        Medium       Detect service unbind/destroy and transition to   Mitigated on test hardware
+              restart /                    `ACCESSIBILITY_NOT_GRANTED` with direct recovery  (Multi-OEM validation pending)
               kill after                   path in `MainScreen`                             
               memory pressure                                                               
 

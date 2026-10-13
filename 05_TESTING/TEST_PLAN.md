@@ -67,6 +67,46 @@
 15. Main UI: renders USAGE_ACCESS_REQUIRED banner with one-tap recovery button when usage access revoked
 16. Main UI: renders ACCESSIBILITY_INTERRUPTED banner with re-enable recovery button when service interrupted
 
+### Commitment Lock & Midnight Schedule Test Suite
+
+1.  Commitment Lock: enabling requires affirmative user consent dialog confirmation
+2.  Commitment Lock: immediate tightening — selecting newly restricted app applies immediately
+3.  Commitment Lock: immediate tightening — reducing daily limit applies immediately
+4.  Commitment Lock: deferred relaxation — unselecting protected app is staged until next calendar midnight
+5.  Commitment Lock: deferred relaxation — increasing daily limit is staged until next calendar midnight
+6.  Commitment Lock: unlock request scheduled for target midnight and cancellable prior to boundary
+7.  Commitment Lock: midnight boundary applies staged app removals and increased limits, clearing pending requests
+8.  Commitment Lock: midnight boundary resets daily usage metrics, NOT the commitment itself
+9.  Commitment Lock: SharedPreferences persistence preserves lock state across process death and device reboots
+10. Commitment Lock: developer-only `debugClearCommitmentState()` clears commitment state without midnight wait (gated by `BuildConfig.DEBUG`, stripped in release builds)
+
+### Enforcement Recovery & Restart Test Suite
+
+1.  Enforcement Recovery: `RestrictedAppAccessibilityService.onServiceConnected()` rechecks Usage Access permission and updates protection health
+2.  Enforcement Recovery: missing Usage Access permission reports `USAGE_ACCESS_REQUIRED` and pauses monitoring loops safely
+3.  Enforcement Recovery: `evaluateCurrentForegroundApp()` detects when a restricted app is already in the foreground on service connection
+4.  Enforcement Recovery: over-limit restricted app already in foreground emits `EnforcementTrigger` and launches blocking UI immediately
+5.  Enforcement Recovery: under-limit restricted app already in foreground immediately initiates 5-second continuous live monitoring
+6.  Enforcement Recovery: service reconnection cancels prior package observation jobs without creating duplicate collection loops
+7.  Enforcement Recovery: `onInterrupt()` and `onUnbind()` cleanly cancel live monitoring and transition health states (`ACCESSIBILITY_INTERRUPTED` / `ACCESSIBILITY_NOT_GRANTED`)
+8.  Enforcement Recovery: `ServiceLocator.getLiveLimitEnforcementEngine()` validates coroutine scope activity and recreates engine cleanly on scope changes
+9.  Enforcement Recovery: process recreation from SharedPreferences preserves configured daily limits and commitment lock state
+10. Enforcement Recovery: stale triggers from previous calendar day expire cleanly across day boundaries upon service reconnection
+
+### Physical Device Validation Results (Owner-Confirmed)
+
+- **Test Device Validation (Confirmed PASS)**:
+  - PASS — Debug-only Commitment Lock reset: `[DEBUG TEST] Reset Commitment Lock` clears state cleanly on test hardware without midnight delays.
+  - PASS — Backgrounding & returning: protection active and window event delivery intact.
+  - PASS — App process death / swiping Stop Doom Scroll from Recents: service rebinds and enforcement recovers.
+  - PASS — Device restart / reboot: service reconnects upon unlock and evaluates foreground app.
+  - PASS — Opening restricted app after restart: blocks immediately once limit is reached without requiring Stop Doom Scroll to be launched manually.
+- **Android Force-Stop OS Boundary**:
+  - Explicit force-stop via Android Settings (`am force-stop`) places package into the `STOPPED` state (`FLAG_EXCLUDE_STOPPED_PACKAGES`).
+  - Standard OS behavior prohibits background startup and accessibility binding until the user manually launches the app from the launcher. Documented as standard OS boundary.
+- **Multi-OEM Reliability Testing (Pending Phase 6)**:
+  - Device matrix testing across OEM-specific battery management (Xiaomi MIUI/HyperOS, Samsung OneUI, Oppo ColorOS, Vivo FuntouchOS) remains open.
+
 ## Integration
 
 -   UsageStatsManager → Usage Engine
