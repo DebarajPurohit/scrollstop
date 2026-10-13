@@ -73,6 +73,35 @@ validation phase.\
 3. If usage permissions or service connectivity are interrupted, protection health reflects `USAGE_ACCESS_REQUIRED` or `ACCESSIBILITY_INTERRUPTED` rather than falsely reporting active protection.
 4. OS Force-Stop Boundary: In compliance with core Android platform security behavior, an app explicitly force-stopped via system Settings enters the stopped state and cannot run in the background until the user launches it from the home screen. Stop Doom Scroll acknowledges this OS limitation and directs users to tap the app icon to resume enforcement.
 
+### PD-011 --- Optional Google Sign-In with Guest Entry (Local-First Boundary Preserved)
+
+**Status:** Approved\
+**Decision:** Provide optional Google Sign-In on initial entry and in Settings, while permitting full guest access ("Continue as guest") without requiring an account. Maintain a strict local-first architecture: detailed usage records, limits, and enforcement rules remain stored exclusively on-device and are not uploaded to cloud services.\
+**Reason:** Minimizes friction for new users trying the application while offering optional identity integration without violating the privacy promise.
+
+### PD-012 --- Home Dashboard First with 7-Day Total Phone Usage & 4-Tab Persistent Navigation
+
+**Status:** Approved\
+**Decision:** Adopt a 4-tab persistent navigation model: Home (Dashboard), Limits, History, and Settings. The Home dashboard serves as the initial screen after entry, presenting:
+1. A 7-day bar chart of total phone screen time across all apps.
+2. Today's total phone usage metric.
+3. An app list showing today's usage and 7-day cumulative usage for each app.
+4. A prominent protection-status card reflecting real-time permission and service health.
+5. Clear entry point to configure limits and monitored apps.\
+**Reason:** Provides immediate, high-value insight into device screen time without requiring upfront configuration hurdles, while maintaining clear paths to protection.
+
+### PD-013 --- Theme Mode Selection (System Default, Light, Dark)
+
+**Status:** Approved\
+**Decision:** Adopt a premium minimalist visual design system that defaults to following the Android system theme, while providing an explicit user override in Settings for System Default, Light, and Dark modes. Disable Android 12+ dynamic wallpaper color override to preserve consistent brand slate and emerald aesthetics.\
+**Reason:** Ensures comfortable, high-contrast usage across lighting environments while respecting user control.
+
+### PD-014 --- Mandatory Usage Access Permission Gate Prior to Home Entry
+
+**Status:** Approved\
+**Decision:** Immediately following Welcome selection ("Continue with Google" or "Continue as guest"), route the user to a mandatory Usage Access explanation and permission screen. Access to the Home dashboard is gated and disallowed until Usage Access is verified. Returning from Android Settings triggers auto-verification (`ON_RESUME`), alongside an explicit "Check Again" action. If access is not granted, the user remains on the permission screen with clear guidance. Accessibility permission remains a separate, subsequent step on the Home dashboard required for blocking enforcement, not for reading usage stats.\
+**Reason:** Ensures the Home dashboard always has valid permissions to render total phone screen time and 7-day usage charts, preventing broken or empty states upon first dashboard impression.
+
 ### Change Log
 
   Date         Change                       Reason
@@ -84,4 +113,7 @@ validation phase.\
   2026-10-08   Recorded PD-008              POC-05A Live Limit-Crossing Enforcement
   2026-10-11   Recorded PD-009              Commitment Lock MVP & Midnight Relaxation Schedule
   2026-10-12   Recorded PD-010              Enforcement Recovery & Restart Reliability
+  2026-10-13   Recorded PD-011, PD-012,     Approved UI/UX redesign architecture: guest/Google
+               PD-013                       entry, Home 7d total usage, 4-tab nav, theme modes
+  2026-10-13   Recorded PD-014              Mandatory Usage Access permission gate prior to Home
 

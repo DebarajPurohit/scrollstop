@@ -116,13 +116,44 @@
 -   Permission & Service health checks
 -   ProtectionHealthRepository reactive synchronization
 
-## UI
+## UI & Presentation Layer Tests
 
--   MainScreen navigation to App Selection, Usage Tracking, and Accessibility Disclosure
--   Prominent Disclosure UI displaying non-accessibility-tool disclosure and privacy guarantee
--   ProtectionStatusCard displaying live health state with contextual one-tap recovery buttons
--   Grant Accessibility Permission button opening system settings
--   Internal EnforcementTrigger detection display indicator
+### Redesigned UI Architecture Tests
+- **Welcome & Entry UI**:
+  - Displays "Continue with Google" and "Continue as guest" options with zero friction.
+  - Tapping either option navigates directly to the mandatory Usage Access gate screen.
+- **Mandatory Usage Access Gate UI**:
+  - Enforces permission verification prior to allowing access to Home.
+  - Tapping "Open Settings" launches `Settings.ACTION_USAGE_ACCESS_SETTINGS`.
+  - Returning from Settings with permission granted automatically routes to Home.
+  - Returning without permission blocks navigation into Home and presents instructional guidance.
+  - "Check Again" triggers an immediate re-query of `AppOpsManager`.
+- **Home Dashboard UI**:
+  - Displays 7-day bar chart of total device usage across all applications.
+  - Renders today's total active screen time metric accurately.
+  - App breakdown displays today's usage and 7-day cumulative total per app.
+  - **Incomplete History Handling**: For devices with fewer than 7 days of history, verifies that available days render accurately, missing days display as "No data" (never fabricated as 0 min), "X of 7 days recorded" badge is shown, and average benchmarks reflect only recorded days.
+  - **Data Integrity / Missing Permission Rule**: Asserts that when Usage Access is revoked or data query fails, the UI renders the permission-recovery state and **never** displays "0 min" or zero usage.
+  - Renders `ProtectionStatusCard` showing real-time health state (`PROTECTED`, `USAGE_ACCESS_REQUIRED`, `ACCESSIBILITY_REQUIRED`, `DEGRADED`) with direct recovery actions.
+  - Displays non-blocking contextual guided setup cards for first-time or incomplete setup.
+- **Persistent 4-Tab Navigation**:
+  - Tab transitions between Home, Limits, History, and Settings preserve active state and backstack.
+- **Limits & App Management UI**:
+  - Real-time search query filters installed applications dynamically.
+  - App row displays today's usage, 7-day cumulative usage, and active daily limit.
+  - Limit configuration sheet offers preset duration pills (15m, 30m, 45m, 1h, 1.5h, 2h) and custom duration entry.
+  - Commitment Lock: Tightening rules confirmed as immediate; relaxation shows midnight deferral notice.
+  - Pending change badges ("Removal at midnight", "Limit change at midnight") rendered accurately with cancellation actions.
+- **History UI**:
+  - Interactive 7-day total usage chart allows selecting calendar days to inspect historical daily breakdowns.
+  - Accurately renders day-by-day app consumption and limit compliance indicators.
+- **Settings UI**:
+  - Theme selection segment / dialog: verifies toggling between System Default, Light, and Dark applies theme state dynamically.
+  - Account section renders Guest status with "Link Google Account" or Google profile details.
+  - Production build gate: verifies `[DEBUG TEST] Reset Commitment Lock` is strictly absent in non-debug UI.
+- **Blocking Screen UI**:
+  - Renders calm, distraction-free "Time's up" screen with app label, reached limit, and midnight reset notice.
+  - BackHandler intercepts physical back button and navigates safely to Home Dashboard.
 
 ## Critical Enforcement
 

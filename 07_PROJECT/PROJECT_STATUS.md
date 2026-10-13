@@ -1,7 +1,7 @@
 # Project Status
 
-**Date:** 2026-10-12\
-**Stage:** Commitment Lock & Enforcement Recovery Validated (179 AUTOMATED TESTS PASS — PHYSICAL RECOVERY VALIDATED — MULTI-OEM & PRODUCTION READINESS PENDING)
+**Date:** 2026-10-13\
+**Stage:** UI/UX Redesign Plan Finalized & Specifications Updated (179 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
 
 ## Completed
 
@@ -61,6 +61,17 @@
   - Automated test suite passed 179 tests with 0 failures (`.\gradlew testDebugUnitTest --rerun-tasks`).
   - Debug build: `./gradlew assembleDebug` (BUILD SUCCESSFUL).
   - Release build: `./gradlew assembleRelease` (BUILD SUCCESSFUL, R8/lintVital verified).
+- **UI/UX Audit & Redesign Architecture Finalized**: PASS
+  - Comprehensive source audit completed across existing Compose screens and themes.
+  - Finalized specifications for 4-tab persistent navigation (Home, Limits, History, Settings).
+  - Designed Home Dashboard with 7-day total phone usage bar chart and app breakdown (today + 7-day cumulative).
+  - Defined strict data integrity rule: never display false zero usage when permissions are missing or queries fail.
+  - Formulated optional Google Sign-In with full guest entry under local-first architecture (no cloud sync).
+  - Defined manual Light/Dark/System theme selection defaulting to Android system theme.
+  - Preserved 100% of validated domain and enforcement logic (UsageStatsManager, UsageRuleEngine, CommitmentRuleEngine, RestrictedAppAccessibilityService).
+  - Integrated mandatory Usage Access permission gate immediately after Welcome entry (Google or Guest) before Home access.
+  - Retained Accessibility Service as a separate subsequent step for enforcement blocking.
+  - Updated `UI_SPEC.md`, `USER_FLOWS.md`, `PRODUCT_DECISIONS.md`, and `TEST_PLAN.md`.
 
 ## Pending
 
