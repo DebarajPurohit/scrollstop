@@ -190,6 +190,19 @@ object ServiceLocator {
         }
     }
 
+    @Volatile
+    private var themeRepository: com.scrollstop.data.repository.ThemeRepository? = null
+
+    fun getThemeRepository(context: Context): com.scrollstop.data.repository.ThemeRepository {
+        return themeRepository ?: synchronized(this) {
+            themeRepository ?: com.scrollstop.data.repository.SharedPreferencesThemeRepository(
+                context.applicationContext
+            ).also {
+                themeRepository = it
+            }
+        }
+    }
+
     fun resetForTesting(
         selectedAppsRepo: SelectedAppsRepository? = null,
         dailyLimitRepo: DailyLimitRepository? = null,
@@ -200,7 +213,8 @@ object ServiceLocator {
         ruleEngine: UsageRuleEngine? = null,
         liveEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine? = null,
         commitmentLockRepo: com.scrollstop.data.repository.CommitmentLockRepository? = null,
-        commitmentRules: com.scrollstop.domain.rules.CommitmentRuleEngine? = null
+        commitmentRules: com.scrollstop.domain.rules.CommitmentRuleEngine? = null,
+        themeRepo: com.scrollstop.data.repository.ThemeRepository? = null
     ) {
         selectedAppsRepository = selectedAppsRepo
         dailyLimitRepository = dailyLimitRepo
@@ -212,5 +226,6 @@ object ServiceLocator {
         liveLimitEnforcementEngine = liveEngine
         commitmentLockRepository = commitmentLockRepo
         commitmentRuleEngine = commitmentRules
+        themeRepository = themeRepo
     }
 }

@@ -1,13 +1,65 @@
 # Project Status
 
-**Date:** 2026-10-13\
-**Stage:** UI/UX Redesign Plan Finalized & Specifications Updated (179 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
+**Date:** 2026-10-14\
+**Stage:** Phase 2 Shared Component Library Implemented (201 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 2: Shared Component Library**: PASS
+  - Implemented the 6 prioritized reusable UI components in `com.scrollstop.ui.components` adhering strictly to `UI_SPEC.md` and Phase 1 semantic tokens:
+    1. `ScrollStopTopBar`: Clean top bar with headline, optional subtitle, back navigation chevron with >= 48dp touch target, and customizable trailing actions.
+    2. `ScrollStopBottomNav`: 4-destination navigation bar (`HOME`, `LIMITS`, `HISTORY`, `SETTINGS`) with bespoke vector icons, selected state indicators, accessible semantics, and >= 48dp touch targets.
+    3. `AppIconThumbnail`: App icon renderer with safe `toSafeImageBitmap()` conversion, fallback initial letter avatar on `surfaceVariant`, and loading skeleton placeholder.
+    4. `UsageProgressBar`: Dynamic progress bar mapping usage to semantic color thresholds (<80% Emerald `primary`, 80-99% Amber `warning`, >=100% Red `error`, Unrestricted Slate `secondary`) with accessible `ProgressBarRangeInfo`.
+    5. `ProtectionStatusBadge`: Reusable status pill with distinct status dot and text for system protection states (`PROTECTED`, `ACCESSIBILITY_REQUIRED`, `ACCESSIBILITY_INTERRUPTED`, `USAGE_ACCESS_REQUIRED`, `DEGRADED`) and general severity levels (`SUCCESS`, `WARNING`, `ERROR`, `COMMITMENT`, `NEUTRAL`).
+    6. `SevenDayUsageChart`: 7-day retrospective chart enforcing non-fabrication rules:
+       - Recorded days render solid proportional bars with exact duration.
+       - Missing history renders muted dashed outline with "No data" label (never fabricated as 0 min).
+       - Shows "X of 7 days recorded — history building" badge for incomplete history.
+       - Averages computed strictly across valid recorded days.
+       - Interactive day selection with >= 48dp touch targets, plus Loading and Error states.
+  - Added pure domain model `DailyUsageRecord` in `com.scrollstop.domain.model`.
+  - Added Light and Dark Compose Previews across all shared components.
+  - **Scope Boundaries Preserved**:
+    - Zero modifications to screen implementations, navigation logic, usage tracking, rules engines, AccessibilityService, blocking, Commitment Lock, midnight reset or recovery logic.
+    - All existing enforcement and theme tests remained intact.
+  - **Automated Verification**:
+    - Added `ComponentTests` in `app/src/test/java/com/scrollstop/ui/components/` covering all 6 components (10 new tests).
+    - Forced unit test run (`.\gradlew testDebugUnitTest --rerun-tasks`): 201 tests passed (0 failures).
+    - Debug build (`.\gradlew assembleDebug`): BUILD SUCCESSFUL.
+    - Release build (`.\gradlew assembleRelease`): BUILD SUCCESSFUL (lintVital and R8 verified).
+  - **Visual Verification**:
+    - Inspected and verified via Light and Dark `@Preview` composables in each component file. Physical device rendering is pending Phase 3/4 screen integration.
+- **Stop Doom Scroll — Phase 1: Design System & Theme Engine**: PASS
+  - Implemented the foundation of the approved premium minimalist UI redesign per `02_UX/UI_SPEC.md` and `02_UX/USER_FLOWS.md`.
+  - **Color Tokens & Palette**:
+    - Centralized all approved Slate/Emerald color tokens in `Color.kt` (`Slate50`-`Slate950`, `Emerald500`, `Emerald600`, `Emerald950`, `Blue100`-`Blue950`, `Amber100`-`Amber950`, `Red100`-`Red950`).
+    - Configured standard M3 `LightColorScheme` and `DarkColorScheme` mapping semantic slots (background, surface, surfaceVariant, outline, primary, secondary, tertiary, error, etc.) to approved tokens.
+    - Preserved backward-compatible aliases for existing screen references (`PrimaryEmerald`, `DarkBackground`, `LightBackground`, etc.).
+    - Created `ExtendedColors` data class and `LocalExtendedColors` CompositionLocal for domain-specific tokens (commitment lock cards/badges, warning states, containers).
+  - **Theme Behavior & Persistence**:
+    - Created `ThemeMode` enum (`SYSTEM`, `LIGHT`, `DARK`).
+    - Defaults to Android system theme (`ThemeMode.SYSTEM`).
+    - Disabled dynamic wallpaper coloring by default (`dynamicColor = false`) to preserve brand integrity.
+    - Implemented `ThemeRepository` (`SharedPreferencesThemeRepository`) persisting manual user preference in `scrollstop_theme_prefs` (`SharedPreferences` with `Context.MODE_PRIVATE`).
+    - Implemented `InMemoryThemeRepository` for hermetic testing.
+    - Wired `ThemeRepository` into thread-safe `ServiceLocator` (`getThemeRepository(context)` and `resetForTesting(...)`).
+    - Updated `MainActivity` to collect `themeRepository.themeModeFlow` and pass `themeMode` to `StopDoomScrollTheme`. Preference survives activity recreation, app restart, and device reboot.
+  - **Scope Boundaries Preserved**:
+    - No screens or navigation redesigned in this phase.
+    - Zero modifications to `UsageStatsManager`, `UsageRuleEngine`, `CommitmentRuleEngine`, `RestrictedAppAccessibilityService`, or midnight boundaries.
+    - All 179 pre-existing automated tests remained intact and passed with zero regressions.
+  - **Automated Verification**:
+    - Added `SharedPreferencesThemeRepositoryTest` validating default fallback, updates, persistence, and invalid preference recovery.
+    - Added `ThemeEngineTest` validating light/dark tokens, M3 slots, extended colors, and Compose theme resolution.
+    - Forced unit test run (`.\gradlew testDebugUnitTest --rerun-tasks`): 191 tests passed (0 failures).
+    - Debug build (`.\gradlew assembleDebug`): BUILD SUCCESSFUL.
+    - Release build (`.\gradlew assembleRelease`): BUILD SUCCESSFUL (lintVital and R8 verified).
+  - **Visual Verification**:
+    - Added Compose Previews `LightThemePreview` and `DarkThemePreview` in `Theme.kt` for visual inspection of the Slate/Emerald palette and semantic containers. Live device rendering will be validated alongside screen redesign in Phase 2.
 - **POC-01 Android Foundation Established**: PASS
 - **POC-02A App Discovery Established**: PASS
 - **POC-02B Usage Tracking Feasibility**: PASS

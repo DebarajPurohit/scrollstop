@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.scrollstop.data.di.ServiceLocator
 import com.scrollstop.navigation.AppNavigation
 import com.scrollstop.ui.theme.StopDoomScrollTheme
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,9 +21,11 @@ class MainActivity : ComponentActivity() {
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         handleIntent(intent)
         enableEdgeToEdge()
+        val themeRepository = ServiceLocator.getThemeRepository(applicationContext)
         setContent {
             val blockedPackage by blockedPackageFlow.collectAsState()
-            StopDoomScrollTheme {
+            val themeMode by themeRepository.themeModeFlow.collectAsState()
+            StopDoomScrollTheme(themeMode = themeMode) {
                 AppNavigation(
                     initialBlockedPackage = blockedPackage,
                     onClearBlockedPackage = { blockedPackageFlow.value = null }
