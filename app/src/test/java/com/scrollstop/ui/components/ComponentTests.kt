@@ -1,5 +1,6 @@
 package com.scrollstop.ui.components
 
+import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -7,11 +8,17 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.scrollstop.data.repository.SharedPreferencesThemeRepository
+import com.scrollstop.data.repository.ThemeRepository
 import com.scrollstop.domain.model.DailyUsageRecord
 import com.scrollstop.domain.model.ProtectionHealthState
+import com.scrollstop.ui.preview.HomeDashboardPreviewScreen
 import com.scrollstop.ui.theme.StopDoomScrollTheme
 import com.scrollstop.ui.theme.ThemeMode
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -362,6 +369,104 @@ class ComponentTests {
         composeTestRule.onNodeWithText("Mon").assertIsDisplayed()
         composeTestRule.onNodeWithText("Tue").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Mon 8: 1h 0m").assertIsDisplayed()
+    }
+
+    // =========================================================================
+    // HomeDashboardPreviewScreen Theme Selector Tests
+    // =========================================================================
+
+    @Test
+    fun homeDashboardPreviewScreen_rendersThemeSelectorAndSwitchesThemes() {
+        val fakeRepo = FakeThemeRepository(ThemeMode.SYSTEM)
+
+        composeTestRule.setContent {
+            HomeDashboardPreviewScreen(themeRepository = fakeRepo)
+        }
+
+        // Verify preview banner and theme selector labels
+        composeTestRule.onNodeWithText("Theme Mode:").assertIsDisplayed()
+        composeTestRule.onNodeWithText("System").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Light").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Dark").assertIsDisplayed()
+
+        // Initially System is selected
+        composeTestRule.onNodeWithContentDescription("Switch to System theme").assertIsSelected()
+        composeTestRule.onNodeWithContentDescription("Switch to Dark theme").assertIsNotSelected()
+
+        // Switch to Dark
+        composeTestRule.onNodeWithContentDescription("Switch to Dark theme").performClick()
+        assertEquals(ThemeMode.DARK, fakeRepo.getThemeMode())
+        composeTestRule.onNodeWithContentDescription("Switch to Dark theme").assertIsSelected()
+        composeTestRule.onNodeWithContentDescription("Switch to Light theme").assertIsNotSelected()
+
+        // Switch to Light
+        composeTestRule.onNodeWithContentDescription("Switch to Light theme").performClick()
+        assertEquals(ThemeMode.LIGHT, fakeRepo.getThemeMode())
+        composeTestRule.onNodeWithContentDescription("Switch to Light theme").assertIsSelected()
+
+        // Switch back to System
+        composeTestRule.onNodeWithContentDescription("Switch to System theme").performClick()
+        assertEquals(ThemeMode.SYSTEM, fakeRepo.getThemeMode())
+        composeTestRule.onNodeWithContentDescription("Switch to System theme").assertIsSelected()
+    }
+
+    @Test
+    fun homeDashboardPreviewScreen_settingsIconOpensThemeDialogAndSelectsOption() {
+        val fakeRepo = FakeThemeRepository(ThemeMode.SYSTEM)
+
+        composeTestRule.setContent {
+            HomeDashboardPreviewScreen(themeRepository = fakeRepo)
+        }
+
+        // Click top bar settings icon
+        composeTestRule.onNodeWithContentDescription("Theme and Appearance Settings").performClick()
+
+        // Verify Theme & Appearance dialog opens
+        composeTestRule.onNodeWithText("Theme & Appearance").assertIsDisplayed()
+        composeTestRule.onNodeWithText("System default").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Clean Slate/Emerald palette on white").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Deep Slate/Emerald dark mode").assertIsDisplayed()
+
+        // Select Dark mode from dialog by clicking its descriptive row
+        composeTestRule.onNodeWithText("Deep Slate/Emerald dark mode").performClick()
+        assertEquals(ThemeMode.DARK, fakeRepo.getThemeMode())
+
+        // Dialog should be dismissed after selection
+        composeTestRule.onNodeWithText("Theme & Appearance").assertDoesNotExist()
+    }
+
+    @Test
+    fun homeDashboardPreviewScreen_persistsThemeAcrossReloadWithRealSharedPreferences() {
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val prefName = "test_preview_persist_prefs"
+        context.getSharedPreferences(prefName, Context.MODE_PRIVATE).edit().clear().commit()
+
+        val repo1 = SharedPreferencesThemeRepository(context, prefName = prefName)
+        assertEquals(ThemeMode.SYSTEM, repo1.getThemeMode())
+
+        composeTestRule.setContent {
+            HomeDashboardPreviewScreen(themeRepository = repo1)
+        }
+
+        // Switch to Dark via banner button
+        composeTestRule.onNodeWithContentDescription("Switch to Dark theme").performClick()
+        assertEquals(ThemeMode.DARK, repo1.getThemeMode())
+
+        // Simulate app restart / new repository instance reading from SharedPreferences
+        val repo2 = SharedPreferencesThemeRepository(context, prefName = prefName)
+        assertEquals(ThemeMode.DARK, repo2.getThemeMode())
+        assertEquals(ThemeMode.DARK, repo2.themeModeFlow.value)
+    }
+
+    private class FakeThemeRepository(initialMode: ThemeMode = ThemeMode.SYSTEM) : ThemeRepository {
+        private val _themeModeFlow = MutableStateFlow(initialMode)
+        override val themeModeFlow: StateFlow<ThemeMode> = _themeModeFlow
+
+        override fun getThemeMode(): ThemeMode = _themeModeFlow.value
+
+        override fun setThemeMode(themeMode: ThemeMode) {
+            _themeModeFlow.value = themeMode
+        }
     }
 }
 

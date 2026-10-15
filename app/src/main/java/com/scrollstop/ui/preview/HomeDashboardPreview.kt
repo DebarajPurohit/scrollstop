@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -31,10 +32,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,15 +48,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.scrollstop.data.di.ServiceLocator
+import com.scrollstop.data.repository.ThemeRepository
 import com.scrollstop.domain.model.DailyUsageRecord
 import com.scrollstop.domain.model.ProtectionHealthState
 import com.scrollstop.ui.components.AppIconThumbnail
@@ -170,8 +178,18 @@ object PreviewSampleData {
 @Composable
 fun HomeDashboardPreviewScreen(
     modifier: Modifier = Modifier,
-    onClose: (() -> Unit)? = null
+    onClose: (() -> Unit)? = null,
+    themeRepository: ThemeRepository? = null,
+    previewThemeMode: ThemeMode? = null
 ) {
+    val context = LocalContext.current.applicationContext
+    val resolvedThemeRepo = remember(context, themeRepository) {
+        themeRepository ?: ServiceLocator.getThemeRepository(context)
+    }
+    val persistedThemeMode by resolvedThemeRepo.themeModeFlow.collectAsState()
+    val activeThemeMode = previewThemeMode ?: persistedThemeMode
+    var showThemeDialog by remember { mutableStateOf(false) }
+
     var simulateFullHistory by remember { mutableStateOf(false) }
     var currentNavDestination by remember { mutableStateOf(BottomNavDestination.HOME) }
     var selectedDayIndex by remember { mutableStateOf<Int?>(null) }
@@ -187,68 +205,198 @@ fun HomeDashboardPreviewScreen(
         selectedDayIndex = selectedDayIndex
     )
 
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            Column {
-                // Preview Mode Banner
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "PREVIEW MOCKUP • SAMPLE DATA",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            letterSpacing = 0.5.sp
-                        )
-
-                        if (onClose != null) {
-                            Text(
-                                text = "Close Preview",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.error), RoundedCornerShape(4.dp))
-                                    .clickable(onClick = onClose)
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    .semantics {
-                                        role = Role.Button
-                                        contentDescription = "Close preview screen"
-                                    }
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = {
+                Text(
+                    text = "Theme & Appearance",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Choose your preferred theme for Stop Doom Scroll:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    listOf(
+                        Triple(ThemeMode.SYSTEM, "System default", "Follows device dark/light setting"),
+                        Triple(ThemeMode.LIGHT, "Light", "Clean Slate/Emerald palette on white"),
+                        Triple(ThemeMode.DARK, "Dark", "Deep Slate/Emerald dark mode")
+                    ).forEach { (mode, title, description) ->
+                        val isSelected = activeThemeMode == mode
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    resolvedThemeRepo.setThemeMode(mode)
+                                    showThemeDialog = false
+                                }
+                                .padding(vertical = 8.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    resolvedThemeRepo.setThemeMode(mode)
+                                    showThemeDialog = false
+                                }
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
+            },
+            confirmButton = {
+                TextButton(onClick = { showThemeDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
+    }
 
-                ScrollStopTopBar(
-                    title = "Stop Doom Scroll",
-                    subtitle = "Intentional digital balance",
-                    actions = {
-                        IconButton(
-                            onClick = { /* Simulated Settings */ },
-                            modifier = Modifier.size(48.dp)
+    StopDoomScrollTheme(themeMode = activeThemeMode) {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            topBar = {
+                Column {
+                    // Preview Mode Banner with Theme Mode Selector
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Settings,
-                                contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "PREVIEW MOCKUP • SAMPLE DATA",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                if (onClose != null) {
+                                    Text(
+                                        text = "Close Preview",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.error), RoundedCornerShape(4.dp))
+                                            .clickable(onClick = onClose)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            .semantics {
+                                                role = Role.Button
+                                                contentDescription = "Close preview screen"
+                                            }
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Accessible Theme Selector
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Theme Mode:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf(
+                                        ThemeMode.SYSTEM to "System",
+                                        ThemeMode.LIGHT to "Light",
+                                        ThemeMode.DARK to "Dark"
+                                    ).forEach { (mode, label) ->
+                                        val isSelected = activeThemeMode == mode
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(
+                                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.surface
+                                                )
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                                    else MaterialTheme.colorScheme.outline,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                )
+                                                .clickable { resolvedThemeRepo.setThemeMode(mode) }
+                                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                .semantics {
+                                                    this.role = Role.RadioButton
+                                                    this.selected = isSelected
+                                                    this.contentDescription = "Switch to $label theme"
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                                else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                )
-            }
-        },
+
+                    ScrollStopTopBar(
+                        title = "Stop Doom Scroll",
+                        subtitle = "Intentional digital balance",
+                        actions = {
+                            IconButton(
+                                onClick = { showThemeDialog = true },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Settings,
+                                    contentDescription = "Theme and Appearance Settings",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    )
+                }
+            },
         bottomBar = {
             ScrollStopBottomNav(
                 currentDestination = currentNavDestination,
@@ -490,6 +638,7 @@ fun HomeDashboardPreviewScreen(
         }
     }
 }
+}
 
 /**
  * Individual application usage row item adhering to UI_SPEC.md.
@@ -576,9 +725,7 @@ private fun AppUsageRowItem(
 )
 @Composable
 fun HomeDashboardPreviewLight() {
-    StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
-        HomeDashboardPreviewScreen()
-    }
+    HomeDashboardPreviewScreen(previewThemeMode = ThemeMode.LIGHT)
 }
 
 @Preview(
@@ -590,9 +737,7 @@ fun HomeDashboardPreviewLight() {
 )
 @Composable
 fun HomeDashboardPreviewDark() {
-    StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
-        HomeDashboardPreviewScreen()
-    }
+    HomeDashboardPreviewScreen(previewThemeMode = ThemeMode.DARK)
 }
 
 @Preview(
@@ -604,7 +749,5 @@ fun HomeDashboardPreviewDark() {
 )
 @Composable
 fun HomeDashboardPreviewLargeFont() {
-    StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
-        HomeDashboardPreviewScreen()
-    }
+    HomeDashboardPreviewScreen(previewThemeMode = ThemeMode.LIGHT)
 }
