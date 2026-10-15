@@ -11,6 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.scrollstop.domain.model.DailyUsageRecord
 import com.scrollstop.domain.model.ProtectionHealthState
 import com.scrollstop.ui.theme.StopDoomScrollTheme
+import com.scrollstop.ui.theme.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -318,4 +319,49 @@ class ComponentTests {
         composeTestRule.onNodeWithText("Retry").performClick()
         assertTrue(retryTriggered)
     }
+
+    @Test
+    fun sevenDayUsageChart_rendersWeekdayLabelsInDarkTheme() {
+        val days = listOf(
+            DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 3_600_000L, hasRecord = true),
+            DailyUsageRecord("Tue 9", "Tue", 2L, totalScreenTimeMs = 0L, hasRecord = false),
+            DailyUsageRecord("Today", "Wed", 3L, totalScreenTimeMs = 5_400_000L, hasRecord = true, isCurrentDay = true)
+        )
+
+        val state = SevenDayChartState.Success(days = days)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
+                SevenDayUsageChart(state = state)
+            }
+        }
+
+        // Verify weekday labels are rendered
+        composeTestRule.onNodeWithText("Mon").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Tue").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Today").assertIsDisplayed()
+        composeTestRule.onNodeWithText("No data").assertIsDisplayed()
+    }
+
+    @Test
+    fun sevenDayUsageChart_selectedDayHighlightsCorrectly() {
+        val days = listOf(
+            DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 3_600_000L, hasRecord = true),
+            DailyUsageRecord("Tue 9", "Tue", 2L, totalScreenTimeMs = 7_200_000L, hasRecord = true)
+        )
+
+        // Select the first day (index 0)
+        val state = SevenDayChartState.Success(days = days, selectedDayIndex = 0)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
+                SevenDayUsageChart(state = state)
+            }
+        }
+
+        composeTestRule.onNodeWithText("Mon").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Tue").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Mon 8: 1h 0m").assertIsDisplayed()
+    }
 }
+

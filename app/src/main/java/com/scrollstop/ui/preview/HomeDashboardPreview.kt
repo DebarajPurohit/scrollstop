@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -219,7 +220,8 @@ fun HomeDashboardPreviewScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
                                     .border(BorderStroke(1.dp, MaterialTheme.colorScheme.error), RoundedCornerShape(4.dp))
-                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                                    .clickable(onClick = onClose)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                                     .semantics {
                                         role = Role.Button
                                         contentDescription = "Close preview screen"
@@ -403,6 +405,7 @@ fun HomeDashboardPreviewScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)), RoundedCornerShape(6.dp))
+                                .clickable { simulateFullHistory = !simulateFullHistory }
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                                 .semantics {
                                     role = Role.Button

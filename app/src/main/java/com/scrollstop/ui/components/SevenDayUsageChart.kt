@@ -1,5 +1,6 @@
 package com.scrollstop.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -196,7 +197,7 @@ private fun ChartSuccessView(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(140.dp),
+            .defaultMinSize(minHeight = 140.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
@@ -264,7 +265,7 @@ private fun DayBarColumn(
                 text = "No data",
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 8.5.sp,
-                color = MaterialTheme.colorScheme.outline,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 textAlign = TextAlign.Center
             )
@@ -340,10 +341,9 @@ private fun DayBarColumn(
             text = if (record.isCurrentDay) "Today" else record.dayOfWeek,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (record.isCurrentDay || isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (record.isCurrentDay) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+            color = when {
+                record.isCurrentDay || isSelected -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.colorScheme.onSurface
             },
             textAlign = TextAlign.Center
         )
@@ -428,7 +428,11 @@ private fun SevenDayUsageChartIncompletePreview() {
     }
 }
 
-@Preview(name = "Chart Complete History Dark Theme", showBackground = true)
+@Preview(
+    name = "Chart Complete History Dark Theme",
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+    showBackground = true
+)
 @Composable
 private fun SevenDayUsageChartDarkPreview() {
     val sampleDays = listOf(
