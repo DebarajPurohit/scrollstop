@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.scrollstop.domain.model.DailyUsageRecord
 import com.scrollstop.ui.theme.StopDoomScrollTheme
 import com.scrollstop.ui.theme.ThemeMode
@@ -249,7 +250,7 @@ private fun DayBarColumn(
             Text(
                 text = record.formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = androidx.compose.ui.unit.TextUnit(9f, androidx.compose.ui.unit.TextUnitType.Sp),
+                fontSize = 9.sp,
                 color = if (record.isCurrentDay || isSelected) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -262,7 +263,7 @@ private fun DayBarColumn(
             Text(
                 text = "No data",
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = androidx.compose.ui.unit.TextUnit(8.5f, androidx.compose.ui.unit.TextUnitType.Sp),
+                fontSize = 8.5.sp,
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 1,
                 textAlign = TextAlign.Center
@@ -279,8 +280,12 @@ private fun DayBarColumn(
             contentAlignment = Alignment.BottomCenter
         ) {
             if (record.hasRecord) {
-                // Proportional solid bar
-                val ratio = (record.totalScreenTimeMs.toFloat() / maxUsageMs.toFloat()).coerceIn(0.08f, 1.0f)
+                // Proportional solid bar (or subtle 3% baseline for genuine zero usage)
+                val ratio = if (record.totalScreenTimeMs > 0L) {
+                    (record.totalScreenTimeMs.toFloat() / maxUsageMs.toFloat()).coerceIn(0.08f, 1.0f)
+                } else {
+                    0.03f // Subtle baseline cap for genuine zero usage
+                }
                 val barColor = if (record.isCurrentDay) {
                     MaterialTheme.colorScheme.primary
                 } else if (isSelected) {

@@ -138,6 +138,38 @@ class ComponentTests {
         composeTestRule.onNodeWithContentDescription("Unrestricted application usage").assertIsDisplayed()
     }
 
+    @Test
+    fun usageProgressBar_rendersExceededStateWhenUsedExceedsLimit() {
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                UsageProgressBar(
+                    usedMs = 150_000L,
+                    limitMs = 120_000L,
+                    showPercent = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("125%").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: 125%").assertIsDisplayed()
+    }
+
+    @Test
+    fun usageProgressBar_rendersReachedStateWhenLimitZeroOrNegative() {
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                UsageProgressBar(
+                    usedMs = 10_000L,
+                    limitMs = 0L,
+                    showPercent = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("100%").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: 100%").assertIsDisplayed()
+    }
+
     // =========================================================================
     // ProtectionStatusBadge Tests
     // =========================================================================
@@ -241,6 +273,30 @@ class ComponentTests {
 
         // Missing days must announce "No data recorded"
         composeTestRule.onNodeWithContentDescription("Mon 8: No data recorded").assertIsDisplayed()
+    }
+
+    @Test
+    fun sevenDayUsageChart_genuineZeroUsageDistinguishedFromMissingData() {
+        val days = listOf(
+            DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 0L, hasRecord = true),
+            DailyUsageRecord("Tue 9", "Tue", 2L, totalScreenTimeMs = 0L, hasRecord = false)
+        )
+
+        val state = SevenDayChartState.Success(days = days)
+        assertEquals(1, state.recordedDayCount)
+        assertTrue(state.isHistoryIncomplete)
+        assertEquals("0m", state.formattedAverage)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                SevenDayUsageChart(state = state)
+            }
+        }
+
+        // Genuine zero recorded day displays 0m and accessibility text with 0m
+        composeTestRule.onNodeWithContentDescription("Mon 8: 0m").assertIsDisplayed()
+        // Missing day displays No data recorded
+        composeTestRule.onNodeWithContentDescription("Tue 9: No data recorded").assertIsDisplayed()
     }
 
     @Test

@@ -53,11 +53,11 @@ fun UsageProgressBar(
     showPercent: Boolean = false
 ) {
     val extendedColors = MaterialTheme.extendedColors
-    val isConfigured = limitMs != null && limitMs > 0L
-    val ratio = if (isConfigured) {
-        (usedMs.toFloat() / limitMs!!.toFloat()).coerceAtLeast(0f)
-    } else {
-        0f
+    val isConfigured = limitMs != null
+    val ratio = when {
+        !isConfigured -> 0f
+        limitMs!! <= 0L -> 1.0f // A configured zero-minute limit is reached immediately
+        else -> (usedMs.toFloat() / limitMs.toFloat()).coerceAtLeast(0f)
     }
     val clampedProgress = ratio.coerceIn(0f, 1f)
 
@@ -71,11 +71,10 @@ fun UsageProgressBar(
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val cornerShape = RoundedCornerShape(height / 2)
 
-    val percentText = if (isConfigured) {
-        val pct = (ratio * 100).toInt()
-        "$pct%"
-    } else {
-        "No limit"
+    val percentText = when {
+        !isConfigured -> "No limit"
+        limitMs!! <= 0L -> "100%"
+        else -> "${(ratio * 100).toInt()}%"
     }
 
     Column(
