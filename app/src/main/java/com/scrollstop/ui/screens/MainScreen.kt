@@ -54,6 +54,18 @@ fun MainScreen(
 ) {
     var showConsentDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var showUnlockDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var showVisualPreviewDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+    if (showVisualPreviewDialog) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showVisualPreviewDialog = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.scrollstop.ui.preview.HomeDashboardPreviewScreen(
+                onClose = { showVisualPreviewDialog = false }
+            )
+        }
+    }
 
     if (showConsentDialog) {
         CommitmentConsentDialog(
@@ -262,6 +274,23 @@ fun MainScreen(
                         // Developer test-only reset control (excluded from release builds)
                         if (com.scrollstop.BuildConfig.DEBUG) {
                             Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { showVisualPreviewDialog = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .semantics { contentDescription = "View Proposed Home Dashboard Preview Button" },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text(
+                                    text = "[PREVIEW] View Proposed Home Dashboard",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
                             OutlinedButton(
                                 onClick = onDebugResetCommitmentLock,
                                 modifier = Modifier
