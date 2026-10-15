@@ -1,13 +1,34 @@
 # Project Status
 
-**Date:** 2026-10-14\
-**Stage:** Phase 2 Shared Component Library Implemented (201 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
+**Date:** 2026-10-15\
+**Stage:** Phase 3A Approved Home Dashboard Implemented (214 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 3A: Production Home Dashboard Implementation**: PASS
+  - Integrated the approved Home Dashboard design into the production `MainScreen.kt`, replacing the temporary test-harness layout with real repository and engine data.
+  - **Functionality Completed**:
+    1. `ScrollStopTopBar`: App title, subtitle, and Settings gear icon opening theme selector dialog (System, Light, Dark).
+    2. Dynamic `ProtectionStatusCard`: Connected directly to `ProtectionHealthRepository` displaying authentic permission & service health with one-tap recovery buttons (`Settings.ACTION_USAGE_ACCESS_SETTINGS` and `Settings.ACTION_ACCESSIBILITY_SETTINGS`).
+    3. `CommitmentStatusCard`: Dynamic lock status banner and `CommitmentConsentDialog` backed by `CommitmentLockRepository`.
+    4. Today's Screen Time Hero Metric: Real aggregate device foreground usage queried via `UsageStatsRepository.getTodayTotalUsageMs()` with loading and permission-missing error states.
+    5. 7-Day Usage Bar Chart: `SevenDayUsageChart` rendering real 7-calendar-day usage via `UsageStatsRepository.getSevenDayDailyUsage()`, strictly enforcing non-fabrication (missing history displayed as dashed "No data", never 0-min bars).
+    6. Monitored Applications Breakdown: `MonitoredAppUsage` domain list showing monitored apps, today's usage, configured daily limit, `UsageProgressBar` with dynamic semantic threshold coloring, and multi-day observation window annotations (e.g. `(2d of data)` or `(7d)`).
+    7. Clean Empty & Loading States: Empty state when no apps are monitored yet with CTA to configure limits; permission missing state with guidance.
+    8. Honest Navigation: Integrated `ScrollStopBottomNav` with Home, Limits (navigates to `Screen.UsageTracking`), History, and Settings.
+    9. Theme Engine Fidelity: Verified seamless theme switching between System Default, Light, and Dark modes via `ThemeRepository`.
+    10. Debug Drawer Gating: Reset Commitment Lock and Preview Entry controls are strictly placed in a bottom drawer gated by `if (BuildConfig.DEBUG)` and excluded from release UI.
+  - **Scope Boundaries Preserved**:
+    - Zero modifications to `UsageStatsManager` authority, `UsageRuleEngine`, `CommitmentRuleEngine`, `RestrictedAppAccessibilityService`, midnight boundaries, or recovery flows.
+  - **Automated Verification**:
+    - Added unit tests in `MainViewModelTest.kt` verifying dashboard data loading, permission error handling, and monitored app mapping (15 tests total).
+    - Updated UI tests in `MainScreenHealthUiTest.kt` verifying hero metric card, 7-day chart, and monitored applications breakdown (5 tests total).
+    - All 214 unit and Compose tests passed (`.\gradlew testDebugUnitTest`): BUILD SUCCESSFUL (0 failures).
+    - Debug build (`.\gradlew assembleDebug`): BUILD SUCCESSFUL.
+    - Release build (`.\gradlew assembleRelease`): BUILD SUCCESSFUL (R8 and lintVital validated).
 - **Stop Doom Scroll — Phase 2: Shared Component Library**: PASS
   - Implemented the 6 prioritized reusable UI components in `com.scrollstop.ui.components` adhering strictly to `UI_SPEC.md` and Phase 1 semantic tokens:
     1. `ScrollStopTopBar`: Clean top bar with headline, optional subtitle, back navigation chevron with >= 48dp touch target, and customizable trailing actions.

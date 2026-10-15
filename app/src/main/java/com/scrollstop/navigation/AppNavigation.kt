@@ -73,8 +73,22 @@ fun AppNavigation(
         PackageManagerAppDiscoveryRepository(context)
     }
 
-    val mainViewModel = remember(protectionHealthRepository, selectedAppsRepository, commitmentLockRepository) {
-        MainViewModel(protectionHealthRepository, selectedAppsRepository, commitmentLockRepository)
+    val mainViewModel = remember(
+        protectionHealthRepository,
+        selectedAppsRepository,
+        commitmentLockRepository,
+        usageStatsRepository,
+        appDiscoveryRepository,
+        dailyLimitRepository
+    ) {
+        MainViewModel(
+            protectionHealthRepository = protectionHealthRepository,
+            selectedAppsRepository = selectedAppsRepository,
+            commitmentLockRepository = commitmentLockRepository,
+            usageStatsRepository = usageStatsRepository,
+            appDiscoveryRepository = appDiscoveryRepository,
+            dailyLimitRepository = dailyLimitRepository
+        )
     }
 
     // Refresh protection health, check midnight transitions, and clean up expired midnight triggers when resuming to foreground
@@ -117,6 +131,9 @@ fun AppNavigation(
                     currentScreen = Screen.AppSelection
                 },
                 onNavigateToUsage = {
+                    currentScreen = Screen.UsageTracking
+                },
+                onNavigateToLimits = {
                     currentScreen = Screen.UsageTracking
                 },
                 onNavigateToAccessibilityConsent = {

@@ -8,6 +8,11 @@ import android.os.Build
 import android.os.Process
 import com.scrollstop.data.time.SystemTimeProvider
 import com.scrollstop.data.time.TimeProvider
+import com.scrollstop.domain.model.DailyUsageRecord
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * Repository interface for detecting Usage Access permission and querying today's application usage stats.
@@ -16,6 +21,9 @@ interface UsageStatsRepository {
     fun hasUsagePermission(): Boolean
     fun getTodayUsageForPackages(packageNames: Set<String>): Result<Map<String, Long>>
     fun getForegroundPackage(): String? = null
+    fun getTodayTotalUsageMs(): Result<Long> = Result.success(0L)
+    fun getSevenDayDailyUsage(): Result<List<DailyUsageRecord>> = Result.success(emptyList())
+    fun getMultiDayUsageForPackages(packageNames: Set<String>, daysCount: Int = 7): Result<Map<String, Long>> = Result.success(emptyMap())
 }
 
 /**
@@ -226,6 +234,126 @@ class AndroidUsageStatsRepository(
             accumulatedTimeMap
         } catch (e: Exception) {
             emptyMap()
+        }
+    }
+
+    override fun getTodayTotalUsageMs(): Result<Long> {
+        if (!hasUsagePermission()) {
+            return Result.failure(SecurityException("Usage Access permission not granted"))
+        }
+        return try {
+            val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return Result.failure(IllegalStateException("UsageStatsManager service unavailable"))
+
+            val startTime = timeProvider.getStartOfDayMillis()
+            val endTime = timeProvider.currentTimeMillis()
+
+            val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: emptyMap()
+            val totalMs = aggregatedStats.values.sumOf { it.totalTimeInForeground }
+            Result.success(totalMs)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getSevenDayDailyUsage(): Result<List<DailyUsageRecord>> {
+        if (!hasUsagePermission()) {
+            return Result.failure(SecurityException("Usage Access permission not granted"))
+        }
+        return try {
+            val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return Result.failure(IllegalStateException("UsageStatsManager service unavailable"))
+
+            val now = timeProvider.currentTimeMillis()
+            val todayStart = timeProvider.getStartOfDayMillis()
+
+            // Pre-fetch all daily interval stats over the 7-day range to verify record presence
+            val sevenDaysAgoCalendar = Calendar.getInstance().apply {
+                timeInMillis = todayStart
+                add(Calendar.DAY_OF_YEAR, -6)
+            }
+            val rangeStart = sevenDaysAgoCalendar.timeInMillis
+            val intervalStats = usageStatsManager.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY,
+                rangeStart,
+                now
+            ) ?: emptyList()
+
+            val dayOfWeekFormat = SimpleDateFormat("EEE", Locale.US)
+            val dayLabelFormat = SimpleDateFormat("EEE d", Locale.US)
+            val records = mutableListOf<DailyUsageRecord>()
+
+            for (dayOffset in 6 downTo 0) {
+                val cal = Calendar.getInstance().apply {
+                    timeInMillis = todayStart
+                    add(Calendar.DAY_OF_YEAR, -dayOffset)
+                }
+                val dayStart = cal.timeInMillis
+                val isToday = (dayOffset == 0)
+                val dayEnd = if (isToday) now else dayStart + (24 * 60 * 60 * 1000L) - 1L
+
+                val dayAggregated = usageStatsManager.queryAndAggregateUsageStats(dayStart, dayEnd) ?: emptyMap()
+                val totalDayMs = dayAggregated.values.sumOf { it.totalTimeInForeground }
+
+                val date = Date(dayStart)
+                val dayOfWeek = dayOfWeekFormat.format(date)
+                val dayLabel = if (isToday) "Today" else dayLabelFormat.format(date)
+
+                // Today always has an active record because Stop Doom Scroll is running.
+                // For past days, hasRecord is true if either usage was recorded (> 0)
+                // or the operating system recorded an interval covering this day.
+                // If the day predates OS records/installation, hasRecord is false.
+                val hasRecord = if (isToday) {
+                    true
+                } else if (totalDayMs > 0L) {
+                    true
+                } else {
+                    intervalStats.any { stat ->
+                        stat.firstTimeStamp <= dayEnd && stat.lastTimeStamp >= dayStart &&
+                                (stat.totalTimeInForeground > 0L || stat.lastTimeUsed > 0L)
+                    }
+                }
+
+                records.add(
+                    DailyUsageRecord(
+                        dayLabel = dayLabel,
+                        dayOfWeek = dayOfWeek,
+                        dateEpochMillis = dayStart,
+                        totalScreenTimeMs = if (hasRecord) totalDayMs else 0L,
+                        hasRecord = hasRecord,
+                        isCurrentDay = isToday
+                    )
+                )
+            }
+
+            Result.success(records)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun getMultiDayUsageForPackages(packageNames: Set<String>, daysCount: Int): Result<Map<String, Long>> {
+        if (!hasUsagePermission()) {
+            return Result.failure(SecurityException("Usage Access permission not granted"))
+        }
+        return try {
+            val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+                ?: return Result.failure(IllegalStateException("UsageStatsManager service unavailable"))
+
+            val now = timeProvider.currentTimeMillis()
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = timeProvider.getStartOfDayMillis()
+                add(Calendar.DAY_OF_YEAR, -(daysCount - 1))
+            }
+            val startTime = cal.timeInMillis
+
+            val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(startTime, now) ?: emptyMap()
+            val resultMap = packageNames.associateWith { pkg ->
+                aggregatedStats[pkg]?.totalTimeInForeground ?: 0L
+            }
+            Result.success(resultMap)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }
