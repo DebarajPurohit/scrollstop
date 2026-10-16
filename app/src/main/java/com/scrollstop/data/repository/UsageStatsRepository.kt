@@ -11,6 +11,7 @@ import android.os.Process
 import com.scrollstop.data.time.SystemTimeProvider
 import com.scrollstop.data.time.TimeProvider
 import com.scrollstop.domain.model.DailyUsageRecord
+import android.view.inputmethod.InputMethodManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -240,51 +241,79 @@ class AndroidUsageStatsRepository(
     }
 
     /**
-     * Set of user-facing launchable application packages discovered from [PackageManager].
-     * Excludes the home launcher, system UI, Android framework, and Stop Doom Scroll itself.
+     * Resolves all home launcher packages on the device to exclude home screen idling from device screen time.
      */
-    private fun getUserFacingPackages(): Set<String> {
+    private fun getExcludedLauncherPackages(): Set<String> {
         return try {
             val pm = context.packageManager
-            val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-            }
-            val launchableApps = pm.queryIntentActivities(launcherIntent, 0)
-                .mapNotNull { it.activityInfo?.packageName }
-                .toSet()
-
             val homeIntent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_HOME)
             }
-            val defaultLauncher = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
-                ?.activityInfo?.packageName
+            val resolvedLaunchers = pm.queryIntentActivities(homeIntent, 0)
+                .mapNotNull { it.activityInfo?.packageName }
+                .toSet()
 
-            launchableApps - setOfNotNull(
-                defaultLauncher,
-                "com.android.systemui",
-                "android",
-                context.packageName
+            resolvedLaunchers + setOf(
+                "com.google.android.apps.nexuslauncher",
+                "com.sec.android.app.launcher",
+                "com.android.launcher3",
+                "com.miui.home",
+                "com.oppo.launcher",
+                "com.coloros.home",
+                "com.huawei.android.launcher",
+                "net.oneplus.launcher",
+                "com.motorola.launcher3"
             )
+        } catch (e: Exception) {
+            setOf(
+                "com.google.android.apps.nexuslauncher",
+                "com.sec.android.app.launcher",
+                "com.android.launcher3"
+            )
+        }
+    }
+
+    /**
+     * Resolves all installed input method (keyboard) packages on the device.
+     */
+    private fun getExcludedImePackages(): Set<String> {
+        return try {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.inputMethodList?.map { it.packageName }?.toSet() ?: emptySet()
         } catch (e: Exception) {
             emptySet()
         }
     }
 
     /**
-     * Checks whether a package is an operating system service, framework daemon, keyboard (IME), or launcher.
+     * Determines whether a package should be excluded from total device screen time.
+     *
+     * Matches Android Digital Wellbeing behavior:
+     * - Excludes system daemons ("android", "com.android.systemui", "com.google.android.gms").
+     * - Excludes the home screen launcher (Pixel Launcher, Samsung One UI Home, etc.).
+     * - Excludes keyboards and input methods (IMEs) to prevent duplicate counting while typing.
+     * - INCLUDES all user-facing applications, device Settings ("com.android.settings"), phone dialer/in-call
+     *   screens ("com.android.incallui"), files/document viewers, and Stop Doom Scroll itself.
      */
-    private fun isExcludedSystemPackage(pkg: String): Boolean {
+    internal fun isExcludedFromDeviceUsage(
+        pkg: String,
+        launcherPackages: Set<String> = getExcludedLauncherPackages(),
+        imePackages: Set<String> = getExcludedImePackages()
+    ): Boolean {
+        if (pkg == "android" || pkg == "com.android.systemui") return true
+        if (pkg in launcherPackages) return true
+        if (pkg in imePackages) return true
+
         val lower = pkg.lowercase(Locale.ROOT)
-        if (pkg == "android" || pkg == "com.android.systemui" || pkg == context.packageName) return true
         if (lower.contains("inputmethod") || lower.contains(".ime") || lower.endsWith(".keyboard")) return true
-        if (lower == "com.google.android.inputmethod.latin" || lower == "com.samsung.android.honeyboard") return true
-        if (lower == "com.google.android.apps.nexuslauncher" || lower == "com.sec.android.app.launcher") return true
+        if (lower == "com.google.android.inputmethod.latin" || lower == "com.samsung.android.honeyboard" || lower.contains("swiftkey")) return true
         if (lower == "com.google.android.gms") return true
+
         return false
     }
 
     /**
-     * Calculates non-overlapping device foreground screen time across user-facing launchable applications
+     * Calculates non-overlapping device foreground screen time across user-facing applications
      * from chronological [UsageEvents] between [startTime] and [endTime].
      *
      * Returns null if no events exist in the requested timeframe (fallback to daily interval stats).
@@ -297,7 +326,8 @@ class AndroidUsageStatsRepository(
         val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
         if (!events.hasNextEvent()) return null
 
-        val userPackages = getUserFacingPackages()
+        val launcherPackages = getExcludedLauncherPackages()
+        val imePackages = getExcludedImePackages()
         val event = UsageEvents.Event()
 
         var activeSessionStart: Long? = null
@@ -322,13 +352,7 @@ class AndroidUsageStatsRepository(
                 continue
             }
 
-            if (pkg == null) continue
-            val isUserApp = if (userPackages.isNotEmpty()) {
-                pkg in userPackages
-            } else {
-                !isExcludedSystemPackage(pkg)
-            }
-            if (!isUserApp) continue
+            if (pkg == null || isExcludedFromDeviceUsage(pkg, launcherPackages, imePackages)) continue
 
             val className = event.className ?: "default_activity"
 
@@ -346,11 +370,17 @@ class AndroidUsageStatsRepository(
                 UsageEvents.Event.ACTIVITY_PAUSED,
                 UsageEvents.Event.ACTIVITY_STOPPED -> {
                     val activeSet = resumedActivitiesMap[pkg]
-                    if (activeSet != null) {
+                    if (activeSet != null && activeSet.isNotEmpty()) {
                         activeSet.remove(className)
                         if (activeSet.isEmpty()) {
                             resumedActivitiesMap.remove(pkg)
                             activeResumedPackages.remove(pkg)
+                        }
+                    } else if (activeResumedPackages.isEmpty() && activeSessionStart == null && accumulatedTimeMs == 0L) {
+                        // Edge case: App was opened before startTime and paused after startTime
+                        val durationBeforePause = eventTime - startTime
+                        if (durationBeforePause > 0L) {
+                            accumulatedTimeMs += durationBeforePause
                         }
                     } else {
                         activeResumedPackages.remove(pkg)
@@ -395,18 +425,17 @@ class AndroidUsageStatsRepository(
             if (usageFromEvents != null) {
                 Result.success(usageFromEvents)
             } else {
-                // Fallback: Query daily interval stats filtered strictly to user-facing applications
-                val userPackages = getUserFacingPackages()
+                // Fallback: Query daily interval stats filtered strictly to non-excluded applications
+                val launcherPackages = getExcludedLauncherPackages()
+                val imePackages = getExcludedImePackages()
                 val dailyStats = usageStatsManager.queryUsageStats(
                     UsageStatsManager.INTERVAL_DAILY,
                     startTime,
                     endTime
                 ) ?: emptyList()
 
-                val filteredStats = if (userPackages.isNotEmpty()) {
-                    dailyStats.filter { it.packageName in userPackages }
-                } else {
-                    dailyStats.filter { !isExcludedSystemPackage(it.packageName) }
+                val filteredStats = dailyStats.filter {
+                    !isExcludedFromDeviceUsage(it.packageName, launcherPackages, imePackages)
                 }
 
                 // Consolidate foreground times per unique package to eliminate duplicate bucket intervals
@@ -451,7 +480,8 @@ class AndroidUsageStatsRepository(
                 now
             ) ?: emptyList()
 
-            val userPackages = getUserFacingPackages()
+            val launcherPackages = getExcludedLauncherPackages()
+            val imePackages = getExcludedImePackages()
             val dayOfWeekFormat = SimpleDateFormat("EEE", Locale.US)
             val dayLabelFormat = SimpleDateFormat("EEE d", Locale.US)
             val records = mutableListOf<DailyUsageRecord>()
@@ -518,10 +548,8 @@ class AndroidUsageStatsRepository(
                         val hasOsRecord = statsForDay.isNotEmpty()
 
                         if (hasOsRecord) {
-                            val userStats = if (userPackages.isNotEmpty()) {
-                                statsForDay.filter { it.packageName in userPackages }
-                            } else {
-                                statsForDay.filter { !isExcludedSystemPackage(it.packageName) }
+                            val userStats = statsForDay.filter {
+                                !isExcludedFromDeviceUsage(it.packageName, launcherPackages, imePackages)
                             }
 
                             val packageTotals = mutableMapOf<String, Long>()

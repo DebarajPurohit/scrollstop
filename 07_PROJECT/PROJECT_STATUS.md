@@ -1,13 +1,26 @@
 # Project Status
 
 **Date:** 2026-10-16\
-**Stage:** Phase 3A.1 Dashboard Usage Accuracy and Seven-Day Chart Audit (225 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
+**Stage:** Phase 3A.1 Follow-up: Targeted Usage Accuracy Investigation (228 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 3A.1 Follow-up: Targeted Usage Accuracy Investigation**: PASS
+  - Audited physical device 7-day retrospective data against Android Digital Wellbeing (average deficit of ~23m/day across all 7 days).
+  - Identified root cause: `getUserFacingPackages()` previously restricted device screen time strictly to `Intent.CATEGORY_LAUNCHER` activities and explicitly excluded Stop Doom Scroll (`context.packageName`).
+    - Discarded interactive apps lacking launcher intents: Android Settings (`com.android.settings`), Phone in-call UI (`com.android.incallui`, `com.google.android.dialer`), Files / DocumentsUI (`com.android.documentsui`), and Stop Doom Scroll (`context.packageName`), which Digital Wellbeing legitimately attributes to device screen time.
+  - Implemented evidence-supported fix:
+    - Replaced `CATEGORY_LAUNCHER` package whitelist with dynamic system exclusion:
+      - Dynamically queries and excludes all Home Launchers (`Intent.CATEGORY_HOME` + OEM launcher packages).
+      - Dynamically queries and excludes all Keyboards/IMEs via `InputMethodManager` + package name matching.
+      - Strictly excludes `com.android.systemui`, `android` OS framework, and `com.google.android.gms`.
+    - INCLUDES all interactive user applications, device Settings, Phone/InCall UI, Files, and Stop Doom Scroll itself.
+    - Handled sessions spanning across local midnight in `calculateDeviceUsageFromEvents`.
+  - Added 3 targeted unit tests in `AndroidUsageStatsRepositoryTest.kt` verifying Settings, InCallUI, and self-package screen time inclusion, and midnight boundary handling.
+  - Automated verification: 228 unit tests pass (`.\gradlew testDebugUnitTest`); `assembleDebug` and `assembleRelease` compile cleanly with zero errors.
 - **Stop Doom Scroll — Phase 3A.1: Dashboard Usage Accuracy & Seven-Day Chart Audit**: PASS
   - Resolved physical device validation failure: 13h 46m discrepancy vs Android's ~5h system usage display.
   - Replaced naive summation of all system/IME/launcher packages from `queryAndAggregateUsageStats` with chronological `UsageEvents` session reconstruction:

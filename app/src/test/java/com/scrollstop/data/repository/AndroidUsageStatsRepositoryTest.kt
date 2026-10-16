@@ -665,6 +665,139 @@ class AndroidUsageStatsRepositoryTest {
         assertTrue(result.exceptionOrNull() is SecurityException)
     }
 
+    @Test
+    fun `getTodayTotalUsageMs includes Settings, Phone in-call, and self package in total usage`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val settingsPkg = "com.android.settings"
+        val incallPkg = "com.android.incallui"
+        val selfPkg = context.packageName
+
+        val t0 = fakeTimeProvider.startOfDay + 600_000L   // 10m
+        val t1 = fakeTimeProvider.startOfDay + 1200_000L  // 20m (Settings: 10m)
+        val t2 = fakeTimeProvider.startOfDay + 1800_000L  // 30m
+        val t3 = fakeTimeProvider.startOfDay + 2700_000L  // 45m (InCallUI: 15m)
+        val t4 = fakeTimeProvider.startOfDay + 3000_000L  // 50m
+        val t5 = fakeTimeProvider.startOfDay + 3300_000L  // 55m (Self app: 5m)
+
+        // Settings session (10m)
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(settingsPkg)
+                .setClass("SettingsActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(settingsPkg)
+                .setClass("SettingsActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t1)
+                .build()
+        )
+
+        // InCallUI session (15m)
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(incallPkg)
+                .setClass("InCallActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t2)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(incallPkg)
+                .setClass("InCallActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t3)
+                .build()
+        )
+
+        // Self app session (5m)
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(selfPkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t4)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(selfPkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t5)
+                .build()
+        )
+
+        val result = repository.getTodayTotalUsageMs()
+        assertTrue(result.isSuccess)
+        // 10m + 15m + 5m = 30m = 1,800,000 ms
+        assertEquals(1_800_000L, result.getOrThrow())
+    }
+
+    @Test
+    fun `getTodayTotalUsageMs accurately accounts for session active across local midnight`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "com.google.android.youtube"
+        // User opened YouTube before midnight and closes it 15 minutes after midnight
+        val t0 = fakeTimeProvider.startOfDay + 900_000L // 15m after midnight
+
+        // Only ACTIVITY_PAUSED appears in today's query window (opened before midnight)
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("WatchActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t0)
+                .build()
+        )
+
+        val result = repository.getTodayTotalUsageMs()
+        assertTrue(result.isSuccess)
+        // 15m elapsed from startOfDay to t0 = 900,000 ms
+        assertEquals(900_000L, result.getOrThrow())
+    }
+
+    @Test
+    fun `isExcludedFromDeviceUsage accurately classifies packages matching Digital Wellbeing criteria`() {
+        val launcherPackages = setOf("com.google.android.apps.nexuslauncher", "com.sec.android.app.launcher")
+        val imePackages = setOf("com.google.android.inputmethod.latin")
+
+        // Excluded
+        assertTrue(repository.isExcludedFromDeviceUsage("android", launcherPackages, imePackages))
+        assertTrue(repository.isExcludedFromDeviceUsage("com.android.systemui", launcherPackages, imePackages))
+        assertTrue(repository.isExcludedFromDeviceUsage("com.google.android.gms", launcherPackages, imePackages))
+        assertTrue(repository.isExcludedFromDeviceUsage("com.google.android.apps.nexuslauncher", launcherPackages, imePackages))
+        assertTrue(repository.isExcludedFromDeviceUsage("com.google.android.inputmethod.latin", launcherPackages, imePackages))
+        assertTrue(repository.isExcludedFromDeviceUsage("com.samsung.android.honeyboard", launcherPackages, imePackages))
+        assertTrue(repository.isExcludedFromDeviceUsage("com.touchtype.swiftkey", launcherPackages, imePackages))
+
+        // Included (Digital Wellbeing tracks all of these)
+        assertFalse(repository.isExcludedFromDeviceUsage("com.android.settings", launcherPackages, imePackages))
+        assertFalse(repository.isExcludedFromDeviceUsage("com.android.incallui", launcherPackages, imePackages))
+        assertFalse(repository.isExcludedFromDeviceUsage("com.google.android.dialer", launcherPackages, imePackages))
+        assertFalse(repository.isExcludedFromDeviceUsage("com.android.documentsui", launcherPackages, imePackages))
+        assertFalse(repository.isExcludedFromDeviceUsage("com.google.android.youtube", launcherPackages, imePackages))
+        assertFalse(repository.isExcludedFromDeviceUsage("com.instagram.android", launcherPackages, imePackages))
+        assertFalse(repository.isExcludedFromDeviceUsage(context.packageName, launcherPackages, imePackages))
+    }
+
     private class FakeTimeProvider(
         var currentTime: Long,
         var startOfDay: Long,
