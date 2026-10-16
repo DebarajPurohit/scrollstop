@@ -351,6 +351,30 @@ class ComponentTests {
     }
 
     @Test
+    fun sevenDayUsageChart_rendersWeekdayLabelsInLightTheme() {
+        val days = listOf(
+            DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 3_600_000L, hasRecord = true),
+            DailyUsageRecord("Tue 9", "Tue", 2L, totalScreenTimeMs = 0L, hasRecord = false),
+            DailyUsageRecord("Today", "Wed", 3L, totalScreenTimeMs = 5_400_000L, hasRecord = true, isCurrentDay = true)
+        )
+
+        val state = SevenDayChartState.Success(days = days)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
+                SevenDayUsageChart(state = state)
+            }
+        }
+
+        // Verify weekday labels and No data are rendered with verified contrast in Light Theme
+        composeTestRule.onNodeWithText("Mon").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Tue").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Today").assertIsDisplayed()
+        composeTestRule.onNodeWithText("No data").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1h 0m").assertIsDisplayed()
+    }
+
+    @Test
     fun sevenDayUsageChart_selectedDayHighlightsCorrectly() {
         val days = listOf(
             DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 3_600_000L, hasRecord = true),

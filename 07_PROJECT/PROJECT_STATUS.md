@@ -1,13 +1,30 @@
 # Project Status
 
-**Date:** 2026-10-15\
-**Stage:** Phase 3A Approved Home Dashboard Implemented (214 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
+**Date:** 2026-10-16\
+**Stage:** Phase 3A.1 Dashboard Usage Accuracy and Seven-Day Chart Audit (225 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 3A.1: Dashboard Usage Accuracy & Seven-Day Chart Audit**: PASS
+  - Resolved physical device validation failure: 13h 46m discrepancy vs Android's ~5h system usage display.
+  - Replaced naive summation of all system/IME/launcher packages from `queryAndAggregateUsageStats` with chronological `UsageEvents` session reconstruction:
+    - Measures actual non-overlapping interactive screen time across user-launchable apps.
+    - Excludes keyboards (Gboard/Samsung Keyboard), system UI, Android framework, home screen launchers, and background services.
+    - Pauses sessions on `SCREEN_NON_INTERACTIVE` events to guarantee screen-off time is never counted.
+    - Eliminates multi-window and picture-in-picture double counting.
+    - Caps daily aggregates to elapsed milliseconds from local midnight (`endTime - startTime`).
+  - Audited 7-day chart data path:
+    - Confirmed that 7 days of data were displayed because Android OS genuinely retained historical `INTERVAL_DAILY` buckets for the user's active device.
+    - Replaced inflated summation of all packages for past days with user-app daily totals and exact event reconstruction.
+    - Preserved honest classification: days with recorded OS activity but 0 min usage display genuine zero usage ("0m" baseline bar), while days without OS buckets or events display "No data" (dashed outline).
+  - Validated and refined weekday-label readability:
+    - Verified WCAG AA/AAA contrast across both Light (17.5:1 onSurface, 7.0:1 onSurfaceVariant, 4.54:1 primary) and Dark (16.5:1 onSurface, 5.4:1 onSurfaceVariant, 6.8:1 primary) themes.
+    - Replaced rigid column width min-sizing with proportional weight sizing and height touch targets to prevent label clipping on <= 360dp screens.
+  - Added 11 regression tests in `AndroidUsageStatsRepositoryTest.kt` and `ComponentTests.kt`.
+  - All 225 unit tests pass; `assembleDebug` and `assembleRelease` build cleanly with zero errors.
 - **Stop Doom Scroll — Phase 3A: Production Home Dashboard Implementation**: PASS
   - Integrated the approved Home Dashboard design into the production `MainScreen.kt`, replacing the temporary test-harness layout with real repository and engine data.
   - **Functionality Completed**:

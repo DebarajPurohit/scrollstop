@@ -231,7 +231,7 @@ private fun DayBarColumn(
 
     Column(
         modifier = modifier
-            .defaultMinSize(minWidth = 48.dp)
+            .defaultMinSize(minHeight = 48.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = rememberRipple(bounded = false, radius = 24.dp),
@@ -251,7 +251,8 @@ private fun DayBarColumn(
             Text(
                 text = record.formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 9.sp,
+                fontSize = 10.sp,
+                fontWeight = if (record.isCurrentDay || isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (record.isCurrentDay || isSelected) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -264,7 +265,8 @@ private fun DayBarColumn(
             Text(
                 text = "No data",
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 8.5.sp,
+                fontSize = 9.5.sp,
+                fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 textAlign = TextAlign.Center
@@ -313,7 +315,7 @@ private fun DayBarColumn(
                 )
             } else {
                 // Muted dashed outline bar (NOT zero height or 0 min!)
-                val outlineColor = MaterialTheme.colorScheme.outline
+                val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f)
                 Canvas(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -343,8 +345,10 @@ private fun DayBarColumn(
             fontWeight = if (record.isCurrentDay || isSelected) FontWeight.Bold else FontWeight.Normal,
             color = when {
                 record.isCurrentDay || isSelected -> MaterialTheme.colorScheme.primary
+                !record.hasRecord -> MaterialTheme.colorScheme.onSurfaceVariant
                 else -> MaterialTheme.colorScheme.onSurface
             },
+            maxLines = 1,
             textAlign = TextAlign.Center
         )
     }

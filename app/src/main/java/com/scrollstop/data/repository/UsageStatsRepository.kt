@@ -4,6 +4,8 @@ import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
 import com.scrollstop.data.time.SystemTimeProvider
@@ -237,6 +239,142 @@ class AndroidUsageStatsRepository(
         }
     }
 
+    /**
+     * Set of user-facing launchable application packages discovered from [PackageManager].
+     * Excludes the home launcher, system UI, Android framework, and Stop Doom Scroll itself.
+     */
+    private fun getUserFacingPackages(): Set<String> {
+        return try {
+            val pm = context.packageManager
+            val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            val launchableApps = pm.queryIntentActivities(launcherIntent, 0)
+                .mapNotNull { it.activityInfo?.packageName }
+                .toSet()
+
+            val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+            }
+            val defaultLauncher = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                ?.activityInfo?.packageName
+
+            launchableApps - setOfNotNull(
+                defaultLauncher,
+                "com.android.systemui",
+                "android",
+                context.packageName
+            )
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+
+    /**
+     * Checks whether a package is an operating system service, framework daemon, keyboard (IME), or launcher.
+     */
+    private fun isExcludedSystemPackage(pkg: String): Boolean {
+        val lower = pkg.lowercase(Locale.ROOT)
+        if (pkg == "android" || pkg == "com.android.systemui" || pkg == context.packageName) return true
+        if (lower.contains("inputmethod") || lower.contains(".ime") || lower.endsWith(".keyboard")) return true
+        if (lower == "com.google.android.inputmethod.latin" || lower == "com.samsung.android.honeyboard") return true
+        if (lower == "com.google.android.apps.nexuslauncher" || lower == "com.sec.android.app.launcher") return true
+        if (lower == "com.google.android.gms") return true
+        return false
+    }
+
+    /**
+     * Calculates non-overlapping device foreground screen time across user-facing launchable applications
+     * from chronological [UsageEvents] between [startTime] and [endTime].
+     *
+     * Returns null if no events exist in the requested timeframe (fallback to daily interval stats).
+     */
+    private fun calculateDeviceUsageFromEvents(
+        usageStatsManager: UsageStatsManager,
+        startTime: Long,
+        endTime: Long
+    ): Long? {
+        val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
+        if (!events.hasNextEvent()) return null
+
+        val userPackages = getUserFacingPackages()
+        val event = UsageEvents.Event()
+
+        var activeSessionStart: Long? = null
+        val activeResumedPackages = mutableSetOf<String>()
+        val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
+        var accumulatedTimeMs = 0L
+
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val eventType = event.eventType
+            val eventTime = event.timeStamp.coerceIn(startTime, endTime)
+            val pkg = event.packageName
+
+            // Handle screen non-interactive (screen off): close any active session at event timestamp
+            if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                if (activeSessionStart != null && eventTime > activeSessionStart) {
+                    accumulatedTimeMs += (eventTime - activeSessionStart)
+                    activeSessionStart = null
+                }
+                activeResumedPackages.clear()
+                resumedActivitiesMap.clear()
+                continue
+            }
+
+            if (pkg == null) continue
+            val isUserApp = if (userPackages.isNotEmpty()) {
+                pkg in userPackages
+            } else {
+                !isExcludedSystemPackage(pkg)
+            }
+            if (!isUserApp) continue
+
+            val className = event.className ?: "default_activity"
+
+            when (eventType) {
+                UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    val activeSet = resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }
+                    activeSet.add(className)
+                    activeResumedPackages.add(pkg)
+
+                    if (activeSessionStart == null) {
+                        activeSessionStart = eventTime
+                    }
+                }
+
+                UsageEvents.Event.ACTIVITY_PAUSED,
+                UsageEvents.Event.ACTIVITY_STOPPED -> {
+                    val activeSet = resumedActivitiesMap[pkg]
+                    if (activeSet != null) {
+                        activeSet.remove(className)
+                        if (activeSet.isEmpty()) {
+                            resumedActivitiesMap.remove(pkg)
+                            activeResumedPackages.remove(pkg)
+                        }
+                    } else {
+                        activeResumedPackages.remove(pkg)
+                    }
+
+                    if (activeResumedPackages.isEmpty() && activeSessionStart != null) {
+                        if (eventTime > activeSessionStart) {
+                            accumulatedTimeMs += (eventTime - activeSessionStart)
+                        }
+                        activeSessionStart = null
+                    }
+                }
+            }
+        }
+
+        // Include ongoing active session if the device is currently in foreground use at endTime
+        if (activeResumedPackages.isNotEmpty() && activeSessionStart != null && endTime > activeSessionStart) {
+            accumulatedTimeMs += (endTime - activeSessionStart)
+        }
+
+        val maxPossible = maxOf(0L, endTime - startTime)
+        return minOf(accumulatedTimeMs, maxPossible)
+    }
+
     override fun getTodayTotalUsageMs(): Result<Long> {
         if (!hasUsagePermission()) {
             return Result.failure(SecurityException("Usage Access permission not granted"))
@@ -248,9 +386,41 @@ class AndroidUsageStatsRepository(
             val startTime = timeProvider.getStartOfDayMillis()
             val endTime = timeProvider.currentTimeMillis()
 
-            val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime) ?: emptyMap()
-            val totalMs = aggregatedStats.values.sumOf { it.totalTimeInForeground }
-            Result.success(totalMs)
+            val usageFromEvents = calculateDeviceUsageFromEvents(
+                usageStatsManager = usageStatsManager,
+                startTime = startTime,
+                endTime = endTime
+            )
+
+            if (usageFromEvents != null) {
+                Result.success(usageFromEvents)
+            } else {
+                // Fallback: Query daily interval stats filtered strictly to user-facing applications
+                val userPackages = getUserFacingPackages()
+                val dailyStats = usageStatsManager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY,
+                    startTime,
+                    endTime
+                ) ?: emptyList()
+
+                val filteredStats = if (userPackages.isNotEmpty()) {
+                    dailyStats.filter { it.packageName in userPackages }
+                } else {
+                    dailyStats.filter { !isExcludedSystemPackage(it.packageName) }
+                }
+
+                // Consolidate foreground times per unique package to eliminate duplicate bucket intervals
+                val packageTotals = mutableMapOf<String, Long>()
+                for (stat in filteredStats) {
+                    val pkg = stat.packageName
+                    val current = packageTotals[pkg] ?: 0L
+                    packageTotals[pkg] = maxOf(current, stat.totalTimeInForeground)
+                }
+
+                val totalMs = packageTotals.values.sum()
+                val maxPossibleMs = maxOf(0L, endTime - startTime)
+                Result.success(minOf(totalMs, maxPossibleMs))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -267,63 +437,129 @@ class AndroidUsageStatsRepository(
             val now = timeProvider.currentTimeMillis()
             val todayStart = timeProvider.getStartOfDayMillis()
 
-            // Pre-fetch all daily interval stats over the 7-day range to verify record presence
-            val sevenDaysAgoCalendar = Calendar.getInstance().apply {
+            // Calculate range start (6 days before today)
+            val rangeCal = Calendar.getInstance().apply {
                 timeInMillis = todayStart
                 add(Calendar.DAY_OF_YEAR, -6)
             }
-            val rangeStart = sevenDaysAgoCalendar.timeInMillis
+            val rangeStart = rangeCal.timeInMillis
+
+            // Pre-fetch all daily interval stats over the 7-day range to verify record presence
             val intervalStats = usageStatsManager.queryUsageStats(
                 UsageStatsManager.INTERVAL_DAILY,
                 rangeStart,
                 now
             ) ?: emptyList()
 
+            val userPackages = getUserFacingPackages()
             val dayOfWeekFormat = SimpleDateFormat("EEE", Locale.US)
             val dayLabelFormat = SimpleDateFormat("EEE d", Locale.US)
             val records = mutableListOf<DailyUsageRecord>()
 
             for (dayOffset in 6 downTo 0) {
-                val cal = Calendar.getInstance().apply {
+                val dayCal = Calendar.getInstance().apply {
                     timeInMillis = todayStart
                     add(Calendar.DAY_OF_YEAR, -dayOffset)
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
                 }
-                val dayStart = cal.timeInMillis
+                val dayStart = dayCal.timeInMillis
                 val isToday = (dayOffset == 0)
-                val dayEnd = if (isToday) now else dayStart + (24 * 60 * 60 * 1000L) - 1L
-
-                val dayAggregated = usageStatsManager.queryAndAggregateUsageStats(dayStart, dayEnd) ?: emptyMap()
-                val totalDayMs = dayAggregated.values.sumOf { it.totalTimeInForeground }
+                val dayEnd = if (isToday) now else {
+                    Calendar.getInstance().apply {
+                        timeInMillis = dayStart
+                        add(Calendar.DAY_OF_YEAR, 1)
+                    }.timeInMillis - 1L
+                }
 
                 val date = Date(dayStart)
                 val dayOfWeek = dayOfWeekFormat.format(date)
                 val dayLabel = if (isToday) "Today" else dayLabelFormat.format(date)
 
-                // Today always has an active record because Stop Doom Scroll is running.
-                // For past days, hasRecord is true if either usage was recorded (> 0)
-                // or the operating system recorded an interval covering this day.
-                // If the day predates OS records/installation, hasRecord is false.
-                val hasRecord = if (isToday) {
-                    true
-                } else if (totalDayMs > 0L) {
-                    true
+                if (isToday) {
+                    val todayUsage = getTodayTotalUsageMs().getOrDefault(0L)
+                    records.add(
+                        DailyUsageRecord(
+                            dayLabel = dayLabel,
+                            dayOfWeek = dayOfWeek,
+                            dateEpochMillis = dayStart,
+                            totalScreenTimeMs = todayUsage,
+                            hasRecord = true,
+                            isCurrentDay = true
+                        )
+                    )
                 } else {
-                    intervalStats.any { stat ->
-                        stat.firstTimeStamp <= dayEnd && stat.lastTimeStamp >= dayStart &&
-                                (stat.totalTimeInForeground > 0L || stat.lastTimeUsed > 0L)
+                    // Past day: first attempt event reconstruction if available
+                    val eventUsage = calculateDeviceUsageFromEvents(
+                        usageStatsManager = usageStatsManager,
+                        startTime = dayStart,
+                        endTime = dayEnd
+                    )
+
+                    if (eventUsage != null) {
+                        records.add(
+                            DailyUsageRecord(
+                                dayLabel = dayLabel,
+                                dayOfWeek = dayOfWeek,
+                                dateEpochMillis = dayStart,
+                                totalScreenTimeMs = eventUsage,
+                                hasRecord = true,
+                                isCurrentDay = false
+                            )
+                        )
+                    } else {
+                        // Check if OS has daily bucket interval stats covering this calendar day
+                        val statsForDay = intervalStats.filter { stat ->
+                            stat.firstTimeStamp <= dayEnd && stat.lastTimeStamp >= dayStart
+                        }
+
+                        val hasOsRecord = statsForDay.isNotEmpty()
+
+                        if (hasOsRecord) {
+                            val userStats = if (userPackages.isNotEmpty()) {
+                                statsForDay.filter { it.packageName in userPackages }
+                            } else {
+                                statsForDay.filter { !isExcludedSystemPackage(it.packageName) }
+                            }
+
+                            val packageTotals = mutableMapOf<String, Long>()
+                            for (stat in userStats) {
+                                val pkg = stat.packageName
+                                val current = packageTotals[pkg] ?: 0L
+                                packageTotals[pkg] = maxOf(current, stat.totalTimeInForeground)
+                            }
+
+                            val totalDayMs = packageTotals.values.sum()
+                            val dayDuration = dayEnd - dayStart + 1L
+                            val cappedDayMs = minOf(totalDayMs, dayDuration)
+
+                            records.add(
+                                DailyUsageRecord(
+                                    dayLabel = dayLabel,
+                                    dayOfWeek = dayOfWeek,
+                                    dateEpochMillis = dayStart,
+                                    totalScreenTimeMs = cappedDayMs,
+                                    hasRecord = true,
+                                    isCurrentDay = false
+                                )
+                            )
+                        } else {
+                            // Genuine missing / unavailable day (predates installation, device was off, or history purged)
+                            records.add(
+                                DailyUsageRecord(
+                                    dayLabel = dayLabel,
+                                    dayOfWeek = dayOfWeek,
+                                    dateEpochMillis = dayStart,
+                                    totalScreenTimeMs = 0L,
+                                    hasRecord = false,
+                                    isCurrentDay = false
+                                )
+                            )
+                        }
                     }
                 }
-
-                records.add(
-                    DailyUsageRecord(
-                        dayLabel = dayLabel,
-                        dayOfWeek = dayOfWeek,
-                        dateEpochMillis = dayStart,
-                        totalScreenTimeMs = if (hasRecord) totalDayMs else 0L,
-                        hasRecord = hasRecord,
-                        isCurrentDay = isToday
-                    )
-                )
             }
 
             Result.success(records)
