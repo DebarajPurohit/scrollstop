@@ -1,13 +1,35 @@
 # Project Status
 
-**Date:** 2026-10-16\
-**Stage:** Phase 3A.1 Follow-up: Targeted Usage Accuracy Investigation (228 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
+**Date:** 2026-10-17\
+**Stage:** Targeted Bug-Fix Sprint: App Selection, Usage Refresh & Limit Display (236 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Targeted Bug-Fix Sprint: App Selection, Usage Refresh & Limit Display**: PASS
+  - **Issue A (Cannot add or remove monitored apps)**:
+    - Root cause: Tapping "Configure Limits & Add Apps" navigated to `UsageScreen` (`Screen.UsageTracking`), which only displayed selected apps and had no entry point to `AppSelectionScreen` unless the selection was completely empty. Furthermore, neither `UsageScreen` nor `EditLimitDialog` offered any mechanism to remove a monitored app.
+    - Fixed navigation: Added "+ Add" button in MainScreen's Monitored Applications card header, "Add Apps" button in `UsageScreen`'s top bar, and "Add / Remove Monitored Apps" button at the bottom of `UsageScreen`'s list. Tracked `previousScreen` in `AppNavigation` so navigating back returns to the calling screen.
+    - Fixed removal: Added `removeMonitoredApp(packageName)` to `UsageViewModel` wired into `EditLimitDialog`. If Commitment Lock is inactive, the app is removed immediately from `SelectedAppsRepository`. If locked, removal is staged in `CommitmentLockRepository` for midnight reset with clear UI explanation ("Scheduled for removal at midnight reset"). Added real-time observation of `selectedAppsRepository.selectedPackageNames` in `UsageViewModel` so additions and removals immediately re-query and refresh.
+  - **Issue B (Usage display does not visibly refresh)**:
+    - Root cause 1: `calculateUsageFromEvents` checked `if (pkg !in packageNames) continue` before checking event types. System-level `SCREEN_NON_INTERACTIVE` events (which have package `android` or null) were completely ignored. As a result, when the phone was locked with Facebook in the foreground, the session was not paused at screen-off, accumulating hours of locked screen time.
+    - Root cause 2: `calculateDeviceUsageFromEvents` did not resume active session accumulation on `SCREEN_INTERACTIVE` or subsequent `ACTIVITY_RESUMED` events after screen-off, causing active usage to stop updating after unlocking.
+    - Root cause 3: `MainScreen` lacked lifecycle (`ON_RESUME`) and user-triggered refresh capabilities.
+    - Fixed: Intercepted `SCREEN_NON_INTERACTIVE` and `SCREEN_INTERACTIVE` before package filtering in `calculateUsageFromEvents` and `calculateDeviceUsageFromEvents`. Paused active sessions on screen-off and resumed on unlock or activity resume. Added `onRefresh` to `MainScreen` with `LaunchedEffect(Unit)`, `ON_RESUME` observer, and a top-bar refresh button.
+  - **Issue C (Excessive usage percentage and progress-bar presentation)**:
+    - Root cause: Unbounded string interpolation `${(ratio * 100).toInt()}%` produced extreme percentages like `6105%` when 2h 2m was compared to a 2m POC limit.
+    - Fixed: Bounded progress visual fill via `ratio.coerceIn(0f, 1f)`. Capped formatted display of extreme exceeded ratios (>=1000% / >9.99x) to `">999%"` with `contentDescription = "Usage progress: >999%"`. Guaranteed zero-minute limits display as `100%` (never `No limit`).
+  - **Automated Verification**:
+    - Added 8 new regression tests:
+      - `AndroidUsageStatsRepositoryTest`: screen-off exclusion and screen-on resumption without extra `ACTIVITY_RESUMED` events.
+      - `UsageViewModelTest`: `removeMonitoredApp` immediate removal when unlocked and midnight staging when locked.
+      - `ComponentTests`: extreme ratio capping (`>999%`) and bounded visual progress.
+      - `MainScreenHealthUiTest`: refresh button callback and Add Monitored Apps navigation.
+    - 236 unit tests pass (`.\gradlew testDebugUnitTest`): BUILD SUCCESSFUL (0 failures, 100% success).
+    - `assembleDebug` build: BUILD SUCCESSFUL (35s).
+    - `assembleRelease` build: BUILD SUCCESSFUL (3m 51s, lintVital and R8 verified).
 - **Stop Doom Scroll — Phase 3A.1 Follow-up: Targeted Usage Accuracy Investigation**: PASS
   - Audited physical device 7-day retrospective data against Android Digital Wellbeing (average deficit of ~23m/day across all 7 days).
   - Identified root cause: `getUserFacingPackages()` previously restricted device screen time strictly to `Intent.CATEGORY_LAUNCHER` activities and explicitly excluded Stop Doom Scroll (`context.packageName`).

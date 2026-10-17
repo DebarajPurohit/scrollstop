@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -293,6 +294,58 @@ class UsageViewModelTest {
         // UI state contains pending increased limit
         val state = viewModel.uiState.value as UsageUiState.Success
         assertEquals(300_000L, state.pendingIncreasedLimits["com.google.android.youtube"])
+    }
+
+    @Test
+    fun `when not locked - removeMonitoredApp removes immediately`() {
+        val usageRepo = FakeUsageStatsRepository(hasPermission = true)
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(
+                DiscoveredApp("com.facebook.katana", "Facebook"),
+                DiscoveredApp("com.google.android.youtube", "YouTube")
+            )
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.facebook.katana", "com.google.android.youtube"))
+
+        val viewModel = UsageViewModel(
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = discoveryRepo,
+            selectedAppsRepository = selectedRepo
+        )
+
+        val removed = viewModel.removeMonitoredApp("com.facebook.katana")
+        assertTrue(removed)
+        assertFalse(selectedRepo.getSelectedPackages().contains("com.facebook.katana"))
+        assertTrue(selectedRepo.getSelectedPackages().contains("com.google.android.youtube"))
+    }
+
+    @Test
+    fun `when locked - removeMonitoredApp stages removal for midnight`() {
+        val usageRepo = FakeUsageStatsRepository(hasPermission = true)
+        val discoveryRepo = FakeAppDiscoveryRepository(
+            discovered = listOf(DiscoveredApp("com.facebook.katana", "Facebook"))
+        )
+        val selectedRepo = InMemorySelectedAppsRepository()
+        selectedRepo.setSelectedPackages(setOf("com.facebook.katana"))
+        val commitmentRepo = FakeCommitmentLockRepository()
+        commitmentRepo.enableCommitmentLock(consentConfirmed = true)
+
+        val viewModel = UsageViewModel(
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = discoveryRepo,
+            selectedAppsRepository = selectedRepo,
+            commitmentLockRepository = commitmentRepo
+        )
+
+        val removed = viewModel.removeMonitoredApp("com.facebook.katana")
+        assertTrue(removed)
+        // Remains selected today
+        assertTrue(selectedRepo.getSelectedPackages().contains("com.facebook.katana"))
+        // Staged for removal at midnight
+        assertTrue(commitmentRepo.commitmentState.value.pendingRemovedPackages.contains("com.facebook.katana"))
+        val state = viewModel.uiState.value as UsageUiState.Success
+        assertTrue(state.pendingRemovalPackages.contains("com.facebook.katana"))
     }
 
 

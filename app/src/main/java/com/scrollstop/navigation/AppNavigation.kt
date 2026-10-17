@@ -45,6 +45,7 @@ fun AppNavigation(
     onClearBlockedPackage: () -> Unit = {}
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
+    var previousScreen by remember { mutableStateOf<Screen>(Screen.Main) }
     val context = LocalContext.current.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -97,7 +98,7 @@ fun AppNavigation(
             if (event == Lifecycle.Event.ON_RESUME) {
                 enforcementTriggerRepository.checkAndExpireStaleTriggers()
                 commitmentLockRepository.checkAndApplyMidnightTransitions()
-                mainViewModel.refreshHealth(context)
+                mainViewModel.refreshDashboard(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -127,13 +128,19 @@ fun AppNavigation(
 
             MainScreen(
                 uiState = mainUiState,
+                onRefresh = {
+                    mainViewModel.refreshDashboard(context)
+                },
                 onNavigateToAppSelection = {
+                    previousScreen = Screen.Main
                     currentScreen = Screen.AppSelection
                 },
                 onNavigateToUsage = {
+                    previousScreen = Screen.Main
                     currentScreen = Screen.UsageTracking
                 },
                 onNavigateToLimits = {
+                    previousScreen = Screen.Main
                     currentScreen = Screen.UsageTracking
                 },
                 onNavigateToAccessibilityConsent = {
@@ -170,7 +177,7 @@ fun AppNavigation(
                 onToggleAppSelection = viewModel::toggleAppSelection,
                 onRetry = viewModel::loadApps,
                 onNavigateBack = {
-                    currentScreen = Screen.Main
+                    currentScreen = previousScreen
                 }
             )
         }
@@ -190,6 +197,7 @@ fun AppNavigation(
                 uiState = uiState,
                 onRefresh = viewModel::refreshUsage,
                 onNavigateToAppSelection = {
+                    previousScreen = Screen.UsageTracking
                     currentScreen = Screen.AppSelection
                 },
                 onNavigateBack = {
@@ -197,6 +205,9 @@ fun AppNavigation(
                 },
                 onSetDailyLimit = { pkg, limitMs ->
                     viewModel.setDailyLimit(pkg, limitMs)
+                },
+                onRemoveApp = { pkg ->
+                    viewModel.removeMonitoredApp(pkg)
                 }
             )
         }

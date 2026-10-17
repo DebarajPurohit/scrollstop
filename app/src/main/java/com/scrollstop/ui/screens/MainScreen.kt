@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -35,6 +36,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +49,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -100,10 +106,29 @@ fun MainScreen(
     onRequestUnlock: () -> Unit = {},
     onCancelUnlock: () -> Unit = {},
     onDebugResetCommitmentLock: () -> Unit = {},
+    onRefresh: () -> Unit = {},
     themeRepository: ThemeRepository? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current.applicationContext
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(Unit) {
+        onRefresh()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                onRefresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val resolvedThemeRepo = remember(context, themeRepository) {
         themeRepository ?: ServiceLocator.getThemeRepository(context)
     }
@@ -249,6 +274,18 @@ fun MainScreen(
                 title = stringResource(id = R.string.app_name),
                 subtitle = stringResource(id = R.string.app_description),
                 actions = {
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .semantics { contentDescription = "Refresh Dashboard Usage" }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Refresh Dashboard Usage",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(
                         onClick = { showThemeDialog = true },
                         modifier = Modifier.size(48.dp)
@@ -452,10 +489,25 @@ fun MainScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            ProtectionStatusBadge(
-                                text = "${uiState.monitoredApps.size} Monitored",
-                                severity = if (uiState.monitoredApps.isNotEmpty()) BadgeSeverity.NEUTRAL else BadgeSeverity.WARNING
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (uiState.monitoredApps.isNotEmpty()) {
+                                    TextButton(
+                                        onClick = onNavigateToAppSelection,
+                                        modifier = Modifier.semantics { contentDescription = "Add Monitored Apps Button" }
+                                    ) {
+                                        Text(
+                                            text = "+ Add",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                                ProtectionStatusBadge(
+                                    text = "${uiState.monitoredApps.size} Monitored",
+                                    severity = if (uiState.monitoredApps.isNotEmpty()) BadgeSeverity.NEUTRAL else BadgeSeverity.WARNING
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))

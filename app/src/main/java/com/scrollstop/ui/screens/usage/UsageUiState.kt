@@ -21,7 +21,9 @@ sealed interface UsageUiState {
      */
     data class Success(
         val usageList: List<AppUsageInfo> = emptyList(),
-        val pendingIncreasedLimits: Map<String, Long> = emptyMap()
+        val pendingIncreasedLimits: Map<String, Long> = emptyMap(),
+        val pendingRemovalPackages: Set<String> = emptySet(),
+        val isCommitmentLocked: Boolean = false
     ) : UsageUiState
 
     /**

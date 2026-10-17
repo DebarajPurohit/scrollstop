@@ -39,6 +39,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,12 +71,17 @@ fun UsageScreen(
     onNavigateToAppSelection: () -> Unit,
     onNavigateBack: () -> Unit,
     onSetDailyLimit: ((String, Long) -> Unit)? = null,
+    onRemoveApp: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Automatically re-check permission & usage stats when returning from Settings or resuming
+    // Automatically re-check permission & usage stats when entering or resuming
+    LaunchedEffect(Unit) {
+        onRefresh()
+    }
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -108,6 +114,14 @@ fun UsageScreen(
                     }
                 },
                 actions = {
+                    OutlinedButton(
+                        onClick = onNavigateToAppSelection,
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .semantics { contentDescription = "Add Apps Action" }
+                    ) {
+                        Text(text = "Add Apps")
+                    }
                     OutlinedButton(
                         onClick = onRefresh,
                         modifier = Modifier
@@ -159,7 +173,11 @@ fun UsageScreen(
                         UsageListView(
                             usageList = uiState.usageList,
                             pendingIncreasedLimits = uiState.pendingIncreasedLimits,
-                            onSetDailyLimit = onSetDailyLimit
+                            pendingRemovalPackages = uiState.pendingRemovalPackages,
+                            isCommitmentLocked = uiState.isCommitmentLocked,
+                            onSetDailyLimit = onSetDailyLimit,
+                            onRemoveApp = onRemoveApp,
+                            onNavigateToAppSelection = onNavigateToAppSelection
                         )
                     }
                 }
@@ -310,7 +328,11 @@ private fun ErrorUsageView(errorMessage: String, onRetry: () -> Unit) {
 private fun UsageListView(
     usageList: List<AppUsageInfo>,
     pendingIncreasedLimits: Map<String, Long> = emptyMap(),
-    onSetDailyLimit: ((String, Long) -> Unit)? = null
+    pendingRemovalPackages: Set<String> = emptySet(),
+    isCommitmentLocked: Boolean = false,
+    onSetDailyLimit: ((String, Long) -> Unit)? = null,
+    onRemoveApp: ((String) -> Unit)? = null,
+    onNavigateToAppSelection: () -> Unit = {}
 ) {
     var selectedPackageForEdit by remember { mutableStateOf<AppUsageInfo?>(null) }
 
@@ -318,11 +340,19 @@ private fun UsageListView(
         val app = selectedPackageForEdit!!
         EditLimitDialog(
             appInfo = app,
+            isPendingRemoval = pendingRemovalPackages.contains(app.packageName),
+            isCommitmentLocked = isCommitmentLocked,
             onDismiss = { selectedPackageForEdit = null },
             onConfirmLimit = { newLimitMs ->
                 onSetDailyLimit?.invoke(app.packageName, newLimitMs)
                 selectedPackageForEdit = null
-            }
+            },
+            onRemoveApp = if (onRemoveApp != null) {
+                {
+                    onRemoveApp(app.packageName)
+                    selectedPackageForEdit = null
+                }
+            } else null
         )
     }
 
@@ -337,10 +367,25 @@ private fun UsageListView(
             UsageItemRow(
                 item = item,
                 pendingLimitMs = pendingIncreasedLimits[item.packageName],
-                onEditClick = if (onSetDailyLimit != null) {
+                isPendingRemoval = pendingRemovalPackages.contains(item.packageName),
+                onEditClick = if (onSetDailyLimit != null || onRemoveApp != null) {
                     { selectedPackageForEdit = item }
                 } else null
             )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onNavigateToAppSelection,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .semantics { contentDescription = "Add or Remove Apps Button" }
+            ) {
+                Text(text = "Add / Remove Monitored Apps")
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -348,8 +393,11 @@ private fun UsageListView(
 @Composable
 private fun EditLimitDialog(
     appInfo: AppUsageInfo,
+    isPendingRemoval: Boolean = false,
+    isCommitmentLocked: Boolean = false,
     onDismiss: () -> Unit,
-    onConfirmLimit: (Long) -> Unit
+    onConfirmLimit: (Long) -> Unit,
+    onRemoveApp: (() -> Unit)? = null
 ) {
     val presets = listOf(
         2 * 60 * 1000L to "2 min (POC)",
@@ -364,7 +412,7 @@ private fun EditLimitDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Set Daily Limit: ${appInfo.appLabel}",
+                text = "Configure App: ${appInfo.appLabel}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -390,6 +438,32 @@ private fun EditLimitDialog(
                         Text(text = label)
                     }
                 }
+
+                if (onRemoveApp != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (isPendingRemoval) {
+                        Text(
+                            text = "Scheduled for removal at midnight reset.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        OutlinedButton(
+                            onClick = onRemoveApp,
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics { contentDescription = "Remove App Action" }
+                        ) {
+                            Text(
+                                text = if (isCommitmentLocked) "Remove at Midnight (Commitment Locked)" else "Remove from Monitored Apps"
+                            )
+                        }
+                    }
+                }
             }
         },
         confirmButton = {},
@@ -405,6 +479,7 @@ private fun EditLimitDialog(
 private fun UsageItemRow(
     item: AppUsageInfo,
     pendingLimitMs: Long? = null,
+    isPendingRemoval: Boolean = false,
     onEditClick: (() -> Unit)? = null
 ) {
     val usageDescription = "${item.appLabel}, ${item.packageName}, Today's usage: ${item.formattedUsage}, Limit: ${item.formattedLimit}, Remaining: ${item.formattedRemaining}"
@@ -457,6 +532,15 @@ private fun UsageItemRow(
                         text = "Increase pending: ${com.scrollstop.domain.util.UsageFormatter.formatDuration(pendingLimitMs)} at midnight",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+                if (isPendingRemoval) {
+                    Text(
+                        text = "Removal pending at midnight",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1
                     )

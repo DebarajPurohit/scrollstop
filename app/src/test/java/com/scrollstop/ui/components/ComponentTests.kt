@@ -178,6 +178,22 @@ class ComponentTests {
         composeTestRule.onNodeWithContentDescription("Usage progress: 100%").assertIsDisplayed()
     }
 
+    @Test
+    fun usageProgressBar_rendersCappedIndicatorForExtremeExceededRatio() {
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                UsageProgressBar(
+                    usedMs = 2 * 3600 * 1000L + 2 * 60 * 1000L, // 2h 2m
+                    limitMs = 2 * 60 * 1000L, // 2m limit (6100%)
+                    showPercent = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText(">999%").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: >999%").assertIsDisplayed()
+    }
+
     // =========================================================================
     // ProtectionStatusBadge Tests
     // =========================================================================

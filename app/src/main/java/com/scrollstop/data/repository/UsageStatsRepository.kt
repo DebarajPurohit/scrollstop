@@ -186,18 +186,45 @@ class AndroidUsageStatsRepository(
             val accumulatedTimeMap = mutableMapOf<String, Long>()
             val currentSessionStartMap = mutableMapOf<String, Long>()
             val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
+            var screenIsInteractive = true
 
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
+                val eventType = event.eventType
+                val eventTime = event.timeStamp.coerceIn(startTime, endTime)
+
+                // Handle screen non-interactive (screen off): close active sessions at event timestamp
+                if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                    screenIsInteractive = false
+                    for (pkg in packageNames) {
+                        val start = currentSessionStartMap.remove(pkg)
+                        if (start != null && eventTime > start) {
+                            accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + (eventTime - start)
+                        }
+                    }
+                    continue
+                }
+
+                // Handle screen interactive (screen turned on/unlocked): resume sessions for active foreground apps
+                if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE) {
+                    screenIsInteractive = true
+                    for (pkg in packageNames) {
+                        val activeSet = resumedActivitiesMap[pkg]
+                        if (activeSet != null && activeSet.isNotEmpty() && !currentSessionStartMap.containsKey(pkg)) {
+                            currentSessionStartMap[pkg] = eventTime
+                        }
+                    }
+                    continue
+                }
+
                 val pkg = event.packageName ?: continue
                 if (pkg !in packageNames) continue
 
-                val eventType = event.eventType
-                val eventTime = event.timeStamp
                 val className = event.className ?: "default_activity"
 
                 when (eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> {
+                        screenIsInteractive = true
                         val activeSet = resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }
                         if (activeSet.isEmpty()) {
                             currentSessionStartMap[pkg] = eventTime
@@ -211,6 +238,7 @@ class AndroidUsageStatsRepository(
                         if (activeSet != null && activeSet.isNotEmpty()) {
                             activeSet.remove(className)
                             if (activeSet.isEmpty()) {
+                                resumedActivitiesMap.remove(pkg)
                                 val start = currentSessionStartMap.remove(pkg)
                                 if (start != null && eventTime > start) {
                                     val sessionDuration = eventTime - start
@@ -222,14 +250,16 @@ class AndroidUsageStatsRepository(
                 }
             }
 
-            // Include ongoing session if the app is currently in foreground at endTime
-            for (pkg in packageNames) {
-                val activeSet = resumedActivitiesMap[pkg]
-                if (activeSet != null && activeSet.isNotEmpty()) {
-                    val start = currentSessionStartMap[pkg]
-                    if (start != null && endTime > start) {
-                        val ongoingDuration = endTime - start
-                        accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + ongoingDuration
+            // Include ongoing session if the app is currently in foreground at endTime and screen is interactive
+            if (screenIsInteractive) {
+                for (pkg in packageNames) {
+                    val activeSet = resumedActivitiesMap[pkg]
+                    if (activeSet != null && activeSet.isNotEmpty()) {
+                        val start = currentSessionStartMap[pkg]
+                        if (start != null && endTime > start) {
+                            val ongoingDuration = endTime - start
+                            accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + ongoingDuration
+                        }
                     }
                 }
             }
@@ -334,6 +364,7 @@ class AndroidUsageStatsRepository(
         val activeResumedPackages = mutableSetOf<String>()
         val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
         var accumulatedTimeMs = 0L
+        var screenIsInteractive = true
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
@@ -343,12 +374,20 @@ class AndroidUsageStatsRepository(
 
             // Handle screen non-interactive (screen off): close any active session at event timestamp
             if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                screenIsInteractive = false
                 if (activeSessionStart != null && eventTime > activeSessionStart) {
                     accumulatedTimeMs += (eventTime - activeSessionStart)
                     activeSessionStart = null
                 }
-                activeResumedPackages.clear()
-                resumedActivitiesMap.clear()
+                continue
+            }
+
+            // Handle screen interactive (screen turned on/unlocked): resume active session if app still active
+            if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE) {
+                screenIsInteractive = true
+                if (activeResumedPackages.isNotEmpty() && activeSessionStart == null) {
+                    activeSessionStart = eventTime
+                }
                 continue
             }
 
@@ -358,6 +397,7 @@ class AndroidUsageStatsRepository(
 
             when (eventType) {
                 UsageEvents.Event.ACTIVITY_RESUMED -> {
+                    screenIsInteractive = true
                     val activeSet = resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }
                     activeSet.add(className)
                     activeResumedPackages.add(pkg)
@@ -396,8 +436,8 @@ class AndroidUsageStatsRepository(
             }
         }
 
-        // Include ongoing active session if the device is currently in foreground use at endTime
-        if (activeResumedPackages.isNotEmpty() && activeSessionStart != null && endTime > activeSessionStart) {
+        // Include ongoing active session if the device is currently in foreground use at endTime and screen is interactive
+        if (screenIsInteractive && activeResumedPackages.isNotEmpty() && activeSessionStart != null && endTime > activeSessionStart) {
             accumulatedTimeMs += (endTime - activeSessionStart)
         }
 

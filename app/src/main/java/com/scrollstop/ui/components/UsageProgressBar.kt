@@ -57,6 +57,7 @@ fun UsageProgressBar(
     val ratio = when {
         !isConfigured -> 0f
         limitMs!! <= 0L -> 1.0f // A configured zero-minute limit is reached immediately
+        usedMs <= 0L -> 0f
         else -> (usedMs.toFloat() / limitMs.toFloat()).coerceAtLeast(0f)
     }
     val clampedProgress = ratio.coerceIn(0f, 1f)
@@ -74,6 +75,7 @@ fun UsageProgressBar(
     val percentText = when {
         !isConfigured -> "No limit"
         limitMs!! <= 0L -> "100%"
+        ratio > 9.99f -> ">999%"
         else -> "${(ratio * 100).toInt()}%"
     }
 

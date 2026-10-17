@@ -40,6 +40,36 @@ class UsageViewModel(
 
     init {
         refreshUsage()
+        viewModelScope.launch {
+            selectedAppsRepository.selectedPackageNames.collect {
+                refreshUsage()
+            }
+        }
+    }
+
+    /**
+     * Removes an application from monitoring or stages removal if Commitment Lock is active.
+     * When Commitment Lock is active:
+     * - Immediate removal is blocked (relaxation), staged for next midnight.
+     * When Commitment Lock is inactive:
+     * - Removed immediately from [SelectedAppsRepository].
+     */
+    fun removeMonitoredApp(packageName: String): Boolean {
+        val commitmentState = commitmentLockRepository?.commitmentState?.value
+        val isLocked = commitmentState?.isLocked == true
+
+        return if (isLocked) {
+            val isStaged = commitmentState?.pendingRemovedPackages?.contains(packageName) == true
+            val staged = if (!isStaged) {
+                commitmentLockRepository?.stageAppRemoval(packageName) ?: false
+            } else true
+            refreshUsage()
+            staged
+        } else {
+            selectedAppsRepository.toggleAppSelection(packageName)
+            refreshUsage()
+            true
+        }
     }
 
     /**
@@ -124,10 +154,16 @@ class UsageViewModel(
                         // Sort deterministically by label
                         .sortedBy { it.appLabel.lowercase() }
 
-                    val pendingLimits = commitmentLockRepository?.commitmentState?.value?.pendingIncreasedLimits ?: emptyMap()
+                    val commitmentState = commitmentLockRepository?.commitmentState?.value
+                    val pendingLimits = commitmentState?.pendingIncreasedLimits ?: emptyMap()
+                    val pendingRemovals = commitmentState?.pendingRemovedPackages ?: emptySet()
+                    val isLocked = commitmentState?.isLocked == true
+
                     _uiState.value = UsageUiState.Success(
                         usageList = usageList,
-                        pendingIncreasedLimits = pendingLimits
+                        pendingIncreasedLimits = pendingLimits,
+                        pendingRemovalPackages = pendingRemovals,
+                        isCommitmentLocked = isLocked
                     )
                 }
                 .onFailure { exception ->

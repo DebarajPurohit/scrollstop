@@ -176,6 +176,54 @@ class MainScreenHealthUiTest {
         assertEquals(ThemeMode.DARK, fakeThemeRepo.getThemeMode())
     }
 
+    @Test
+    fun mainScreen_refreshButtonTriggersRefreshCallback() {
+        var refreshed = false
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED
+                    ),
+                    onRefresh = { refreshed = true }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Refresh Dashboard Usage").performClick()
+        assertTrue(refreshed)
+    }
+
+    @Test
+    fun mainScreen_addMonitoredAppsButtonNavigatesToAppSelection() {
+        var addAppsClicked = false
+        val monitoredApps = listOf(
+            MonitoredAppUsage(
+                packageName = "com.facebook.katana",
+                appName = "Facebook",
+                todayUsageMs = 120_000L,
+                dailyLimitMs = 120_000L,
+                cumulativeUsageMs = 120_000L,
+                observationDays = 1
+            )
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        monitoredApps = monitoredApps
+                    ),
+                    onNavigateToAppSelection = { addAppsClicked = true }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Add Monitored Apps Button").performScrollTo().performClick()
+        assertTrue(addAppsClicked)
+    }
+
     private class FakeThemeRepo(initialMode: ThemeMode = ThemeMode.SYSTEM) : ThemeRepository {
         private val _flow = MutableStateFlow(initialMode)
         override val themeModeFlow: StateFlow<ThemeMode> = _flow

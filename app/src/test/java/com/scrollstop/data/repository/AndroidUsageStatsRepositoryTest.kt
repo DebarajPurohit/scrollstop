@@ -775,6 +775,146 @@ class AndroidUsageStatsRepositoryTest {
     }
 
     @Test
+    fun `getTodayUsageForPackages excludes duration when screen is non-interactive`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "com.facebook.katana"
+        val t0 = fakeTimeProvider.startOfDay + 100_000L // 100s: Facebook opened
+        val t1 = fakeTimeProvider.startOfDay + 160_000L // 160s: Screen turned off (phone locked)
+        fakeTimeProvider.currentTime = fakeTimeProvider.startOfDay + 500_000L // 500s: Current time (locked for 340s)
+
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("android")
+                .setClass("Screen")
+                .setEventType(UsageEvents.Event.SCREEN_NON_INTERACTIVE)
+                .setTimeStamp(t1)
+                .build()
+        )
+
+        val result = repository.getTodayUsageForPackages(setOf(pkg))
+        assertTrue(result.isSuccess)
+        val usageMap = result.getOrThrow()
+        // Usage should only be t1 - t0 = 60,000ms, not the 400,000ms until currentTime
+        assertEquals(60_000L, usageMap[pkg])
+    }
+
+    @Test
+    fun `getTodayUsageForPackages resumes accumulation when screen becomes interactive without new activity resumed event`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "com.facebook.katana"
+        val t0 = fakeTimeProvider.startOfDay + 100_000L // 100s: Facebook opened
+        val t1 = fakeTimeProvider.startOfDay + 160_000L // 160s: Screen turned off (phone locked) -> 60s
+        val t2 = fakeTimeProvider.startOfDay + 260_000L // 260s: Screen turned on (unlocked to Facebook)
+        fakeTimeProvider.currentTime = fakeTimeProvider.startOfDay + 300_000L // 300s: Current time -> 40s active since unlock
+
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("android")
+                .setClass("Screen")
+                .setEventType(UsageEvents.Event.SCREEN_NON_INTERACTIVE)
+                .setTimeStamp(t1)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("android")
+                .setClass("Screen")
+                .setEventType(UsageEvents.Event.SCREEN_INTERACTIVE)
+                .setTimeStamp(t2)
+                .build()
+        )
+
+        val result = repository.getTodayUsageForPackages(setOf(pkg))
+        assertTrue(result.isSuccess)
+        val usageMap = result.getOrThrow()
+        // 60s before lock + 40s after unlock = 100,000ms
+        assertEquals(100_000L, usageMap[pkg])
+    }
+
+    @Test
+    fun `getTodayTotalUsageMs pauses on screen non-interactive and resumes on screen interactive without new activity resumed`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "com.instagram.android"
+        val t0 = fakeTimeProvider.startOfDay + 100_000L
+        val t1 = fakeTimeProvider.startOfDay + 200_000L // Screen off (100s active)
+        val t2 = fakeTimeProvider.startOfDay + 400_000L // Screen on
+        val t3 = fakeTimeProvider.startOfDay + 450_000L // Activity paused (50s active)
+        fakeTimeProvider.currentTime = fakeTimeProvider.startOfDay + 500_000L
+
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("android")
+                .setClass("Screen")
+                .setEventType(UsageEvents.Event.SCREEN_NON_INTERACTIVE)
+                .setTimeStamp(t1)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage("android")
+                .setClass("Screen")
+                .setEventType(UsageEvents.Event.SCREEN_INTERACTIVE)
+                .setTimeStamp(t2)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(t3)
+                .build()
+        )
+
+        val result = repository.getTodayTotalUsageMs()
+        assertTrue(result.isSuccess)
+        // 100s + 50s = 150,000ms
+        assertEquals(150_000L, result.getOrThrow())
+    }
+
+    @Test
     fun `isExcludedFromDeviceUsage accurately classifies packages matching Digital Wellbeing criteria`() {
         val launcherPackages = setOf("com.google.android.apps.nexuslauncher", "com.sec.android.app.launcher")
         val imePackages = setOf("com.google.android.inputmethod.latin")
