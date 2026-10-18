@@ -1,13 +1,23 @@
 # Project Status
 
-**Date:** 2026-10-17\
-**Stage:** Targeted Bug-Fix Sprint: App Selection, Usage Refresh & Limit Display (236 AUTOMATED TESTS PASS — ARCHITECTURE & ENFORCEMENT PRESERVED)
+**Date:** 2026-10-18\
+**Stage:** Limit Multiplier Replaced With Commitment Message (240 AUTOMATED TESTS PASS — PRESENTATION-ONLY CHANGE)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Replace Limit Multiplier With Commitment Message**: PASS
+  - Presentation-only UI update: Replaced over-limit multiplier/percentage text (`12.5× your limit` / `>999%` / `125%`) with the exact commitment message: `"Respect the commitment you made to yourself."`.
+  - Layout & styling: Rendered in `UsageProgressBar` using existing typography (`MaterialTheme.typography.labelSmall`, `FontWeight.SemiBold`) and error color token (`MaterialTheme.colorScheme.error`). Configured with `Modifier.fillMaxWidth()` to gracefully prevent clipping/overflow on all screen widths in both Light and Dark themes.
+  - Preserved existing behavior:
+    - App name, actual usage, and configured daily limit remain visible in both under-limit and exceeded states.
+    - Progress indicator track remains visually capped at 100% (`ratio.coerceIn(0f, 1f)`).
+    - Under-limit (`<100%`) and exactly-at-limit (`100%`) retain existing percentage display.
+    - Zero-minute limits retain reached state (`100%`), and unrestricted apps retain `"No limit"`.
+  - Zero modifications to core enforcement, UsageStatsManager, rule engines, limits persistence, or lifecycle services.
+  - Automated verification: 240 unit tests pass (`.\gradlew testDebugUnitTest`); `assembleDebug` (35s) and `assembleRelease` (2m 30s) succeed cleanly.
 - **Stop Doom Scroll — Targeted Bug-Fix Sprint: App Selection, Usage Refresh & Limit Display**: PASS
   - **Issue A (Cannot add or remove monitored apps)**:
     - Root cause: Tapping "Configure Limits & Add Apps" navigated to `UsageScreen` (`Screen.UsageTracking`), which only displayed selected apps and had no entry point to `AppSelectionScreen` unless the selection was completely empty. Furthermore, neither `UsageScreen` nor `EditLimitDialog` offered any mechanism to remove a monitored app.

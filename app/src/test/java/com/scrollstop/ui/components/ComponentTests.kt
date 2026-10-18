@@ -1,9 +1,11 @@
 package com.scrollstop.ui.components
 
 import android.content.Context
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -158,8 +160,26 @@ class ComponentTests {
             }
         }
 
-        composeTestRule.onNodeWithText("125%").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Usage progress: 125%").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: Respect the commitment you made to yourself.").assertIsDisplayed()
+        composeTestRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(1f, 0f..1f, 0))).assertIsDisplayed()
+    }
+
+    @Test
+    fun usageProgressBar_rendersExactlyAtLimitState() {
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                UsageProgressBar(
+                    usedMs = 120_000L,
+                    limitMs = 120_000L,
+                    showPercent = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("100%").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: 100%").assertIsDisplayed()
+        composeTestRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(1f, 0f..1f, 0))).assertIsDisplayed()
     }
 
     @Test
@@ -176,6 +196,7 @@ class ComponentTests {
 
         composeTestRule.onNodeWithText("100%").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Usage progress: 100%").assertIsDisplayed()
+        composeTestRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(1f, 0f..1f, 0))).assertIsDisplayed()
     }
 
     @Test
@@ -190,8 +211,25 @@ class ComponentTests {
             }
         }
 
-        composeTestRule.onNodeWithText(">999%").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Usage progress: >999%").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: Respect the commitment you made to yourself.").assertIsDisplayed()
+        composeTestRule.onNode(hasProgressBarRangeInfo(ProgressBarRangeInfo(1f, 0f..1f, 0))).assertIsDisplayed()
+    }
+
+    @Test
+    fun usageProgressBar_rendersExceededStateInDarkTheme() {
+        composeTestRule.setContent {
+            StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
+                UsageProgressBar(
+                    usedMs = 150_000L,
+                    limitMs = 120_000L,
+                    showPercent = true
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Usage progress: Respect the commitment you made to yourself.").assertIsDisplayed()
     }
 
     // =========================================================================

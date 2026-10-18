@@ -140,6 +140,7 @@ class MainScreenHealthUiTest {
         composeTestRule.onNodeWithText("45m").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("3h 20m (2d of data)").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").performScrollTo().assertIsDisplayed()
 
         // Verify configure limits button
         composeTestRule.onNodeWithText("Configure Limits & Add Apps").performScrollTo().performClick()
@@ -222,6 +223,72 @@ class MainScreenHealthUiTest {
 
         composeTestRule.onNodeWithContentDescription("Add Monitored Apps Button").performScrollTo().performClick()
         assertTrue(addAppsClicked)
+    }
+
+    @Test
+    fun mainScreen_monitoredAppExceededLimit_rendersCommitmentMessageInDarkTheme() {
+        val monitoredApps = listOf(
+            MonitoredAppUsage(
+                packageName = "com.instagram.android",
+                appName = "Instagram",
+                todayUsageMs = 2_700_000L, // 45m
+                dailyLimitMs = 1_800_000L, // 30m limit (exceeded)
+                cumulativeUsageMs = 12_000_000L,
+                observationDays = 2
+            )
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 1,
+                        monitoredApps = monitoredApps
+                    )
+                )
+            }
+        }
+
+        // Verify actual usage and configured limit remain visible
+        composeTestRule.onNodeWithText("Instagram").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("45m").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
+        // Verify commitment message is displayed
+        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_monitoredAppUnderLimit_retainsExistingBehavior() {
+        val monitoredApps = listOf(
+            MonitoredAppUsage(
+                packageName = "com.google.android.youtube",
+                appName = "YouTube",
+                todayUsageMs = 900_000L, // 15m
+                dailyLimitMs = 1_800_000L, // 30m limit (50% under limit)
+                cumulativeUsageMs = 5_000_000L,
+                observationDays = 2
+            )
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 1,
+                        monitoredApps = monitoredApps
+                    )
+                )
+            }
+        }
+
+        // Verify actual usage and configured limit remain visible
+        composeTestRule.onNodeWithText("YouTube").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("15m").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
+        // Verify under-limit percentage is displayed
+        composeTestRule.onNodeWithText("50%").performScrollTo().assertIsDisplayed()
     }
 
     private class FakeThemeRepo(initialMode: ThemeMode = ThemeMode.SYSTEM) : ThemeRepository {

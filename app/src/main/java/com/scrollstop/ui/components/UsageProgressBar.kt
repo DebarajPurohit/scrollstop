@@ -72,10 +72,12 @@ fun UsageProgressBar(
     val trackColor = MaterialTheme.colorScheme.surfaceVariant
     val cornerShape = RoundedCornerShape(height / 2)
 
+    val isExceeded = isConfigured && limitMs!! > 0L && usedMs > limitMs
+
     val percentText = when {
         !isConfigured -> "No limit"
+        isExceeded -> "Respect the commitment you made to yourself."
         limitMs!! <= 0L -> "100%"
-        ratio > 9.99f -> ">999%"
         else -> "${(ratio * 100).toInt()}%"
     }
 
@@ -98,12 +100,15 @@ fun UsageProgressBar(
                     .padding(bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Spacer(modifier = Modifier.weight(1f))
+                if (!isExceeded) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
                 Text(
                     text = percentText,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = progressColor
+                    color = progressColor,
+                    modifier = if (isExceeded) Modifier.fillMaxWidth() else Modifier
                 )
             }
         }
@@ -144,7 +149,9 @@ private fun UsageProgressBarLightPreview() {
             UsageProgressBar(usedMs = 30_000L, limitMs = 120_000L, showPercent = true)
             // Warning (>=80%)
             UsageProgressBar(usedMs = 100_000L, limitMs = 120_000L, showPercent = true)
-            // Limit Reached (>=100%)
+            // Exactly at limit (==100%)
+            UsageProgressBar(usedMs = 120_000L, limitMs = 120_000L, showPercent = true)
+            // Exceeded limit (>100% - commitment message)
             UsageProgressBar(usedMs = 130_000L, limitMs = 120_000L, showPercent = true)
             // No limit
             UsageProgressBar(usedMs = 50_000L, limitMs = null, showPercent = true)
@@ -162,7 +169,9 @@ private fun UsageProgressBarDarkPreview() {
         ) {
             UsageProgressBar(usedMs = 30_000L, limitMs = 120_000L, showPercent = true)
             UsageProgressBar(usedMs = 100_000L, limitMs = 120_000L, showPercent = true)
+            UsageProgressBar(usedMs = 120_000L, limitMs = 120_000L, showPercent = true)
             UsageProgressBar(usedMs = 130_000L, limitMs = 120_000L, showPercent = true)
+            UsageProgressBar(usedMs = 50_000L, limitMs = null, showPercent = true)
         }
     }
 }
