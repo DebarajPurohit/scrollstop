@@ -229,6 +229,27 @@ class LimitsViewModelTest {
     }
 
     @Test
+    fun `filter SOCIAL_VIDEO filters to social and video categorized applications`() = runTest {
+        val apps = listOf(
+            DiscoveredApp("com.instagram.android", "Instagram", category = android.content.pm.ApplicationInfo.CATEGORY_SOCIAL),
+            DiscoveredApp("com.google.android.youtube", "YouTube", category = android.content.pm.ApplicationInfo.CATEGORY_VIDEO),
+            DiscoveredApp("com.calculator.app", "Calculator", category = android.content.pm.ApplicationInfo.CATEGORY_UNDEFINED),
+            DiscoveredApp("com.game.app", "Game", category = android.content.pm.ApplicationInfo.CATEGORY_GAME)
+        )
+        val viewModel = createDefaultViewModel(apps = apps)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onFilterSelect(LimitsFilter.SOCIAL_VIDEO)
+
+        val state = viewModel.uiState.value as LimitsUiState.Success
+        assertEquals(2, state.apps.size)
+        assertTrue(state.apps.any { it.packageName == "com.instagram.android" })
+        assertTrue(state.apps.any { it.packageName == "com.google.android.youtube" })
+        assertFalse(state.apps.any { it.packageName == "com.calculator.app" })
+        assertFalse(state.apps.any { it.packageName == "com.game.app" })
+    }
+
+    @Test
     fun `combined search and filter work together`() = runTest {
         val selectedRepo = InMemorySelectedAppsRepository().apply {
             setSelectedPackages(setOf("com.instagram.android", "com.google.android.youtube"))

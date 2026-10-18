@@ -294,7 +294,8 @@ class LimitsViewModel(
                 limitState = evaluation.limitState,
                 isPendingRemoval = isPendingRemoval,
                 pendingLimitIncreaseMs = pendingLimitMs,
-                formattedPendingLimit = formattedPending
+                formattedPendingLimit = formattedPending,
+                category = app.category
             )
         }
 
@@ -302,13 +303,7 @@ class LimitsViewModel(
         val categoryFiltered = when (activeFilter) {
             LimitsFilter.ALL -> allItems
             LimitsFilter.CONTROLLED -> allItems.filter { it.isSelected }
-            LimitsFilter.SOCIAL_VIDEO -> {
-                // Note: Currently, DiscoveredApp and AppDiscoveryRepository do not capture
-                // or provide category metadata (e.g. ApplicationInfo.CATEGORY_SOCIAL / VIDEO).
-                // Per Step 1 rules, we do not invent an artificial classification system or add dependencies.
-                // Documented as a known limitation for Step 1.
-                emptyList()
-            }
+            LimitsFilter.SOCIAL_VIDEO -> allItems.filter { it.isSocialOrVideo }
         }
 
         // 2. Filter by search query (case-insensitive on label or package name)

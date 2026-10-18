@@ -1,5 +1,6 @@
 package com.scrollstop.domain.model
 
+import android.content.pm.ApplicationInfo
 import android.graphics.drawable.Drawable
 
 /**
@@ -9,10 +10,12 @@ import android.graphics.drawable.Drawable
  * @property appLabel Human-readable display name of the application (e.g. "Social App")
  * @property icon Optional Drawable application icon
  * @property isSelected Whether this application is currently selected by the user for control
+ * @property category Android ApplicationInfo.category identifier (e.g. CATEGORY_SOCIAL, CATEGORY_VIDEO)
  */
 data class DiscoveredApp(
     val packageName: String,
     val appLabel: String,
     val icon: Drawable? = null,
-    val isSelected: Boolean = false
+    val isSelected: Boolean = false,
+    val category: Int = ApplicationInfo.CATEGORY_UNDEFINED
 )

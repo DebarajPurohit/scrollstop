@@ -45,8 +45,13 @@ data class LimitsAppItem(
     val limitState: LimitState = LimitState.NOT_STARTED,
     val isPendingRemoval: Boolean = false,
     val pendingLimitIncreaseMs: Long? = null,
-    val formattedPendingLimit: String? = null
-)
+    val formattedPendingLimit: String? = null,
+    val category: Int = android.content.pm.ApplicationInfo.CATEGORY_UNDEFINED
+) {
+    val isSocialOrVideo: Boolean
+        get() = category == android.content.pm.ApplicationInfo.CATEGORY_SOCIAL ||
+                category == android.content.pm.ApplicationInfo.CATEGORY_VIDEO
+}
 
 /**
  * UI State for the unified Limits & App Management experience.

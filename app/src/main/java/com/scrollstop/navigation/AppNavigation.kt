@@ -1,5 +1,6 @@
 package com.scrollstop.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +15,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.scrollstop.data.di.ServiceLocator
 import com.scrollstop.data.repository.PackageManagerAppDiscoveryRepository
+import com.scrollstop.ui.components.BottomNavDestination
+import com.scrollstop.ui.components.ScrollStopBottomNav
+import com.scrollstop.ui.components.ThemeSelectionDialog
 import com.scrollstop.ui.screens.MainScreen
 import com.scrollstop.ui.screens.MainViewModel
 import com.scrollstop.ui.screens.accessibility.AccessibilityConsentScreen
@@ -22,6 +26,8 @@ import com.scrollstop.ui.screens.appselection.AppSelectionScreen
 import com.scrollstop.ui.screens.appselection.AppSelectionViewModel
 import com.scrollstop.ui.screens.blocking.BlockingScreen
 import com.scrollstop.ui.screens.blocking.BlockingViewModel
+import com.scrollstop.ui.screens.limits.LimitsScreen
+import com.scrollstop.ui.screens.limits.LimitsViewModel
 import com.scrollstop.ui.screens.usage.UsageScreen
 import com.scrollstop.ui.screens.usage.UsageViewModel
 
@@ -30,6 +36,7 @@ import com.scrollstop.ui.screens.usage.UsageViewModel
  */
 sealed interface Screen {
     data object Main : Screen
+    data object Limits : Screen
     data object AppSelection : Screen
     data object UsageTracking : Screen
     data object AccessibilityConsent : Screen
@@ -46,6 +53,7 @@ fun AppNavigation(
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
     var previousScreen by remember { mutableStateOf<Screen>(Screen.Main) }
+    var showThemeDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -71,7 +79,10 @@ fun AppNavigation(
         ServiceLocator.getCommitmentLockRepository(context)
     }
     val appDiscoveryRepository = remember(context) {
-        PackageManagerAppDiscoveryRepository(context)
+        ServiceLocator.getAppDiscoveryRepository(context)
+    }
+    val themeRepository = remember(context) {
+        ServiceLocator.getThemeRepository(context)
     }
 
     val mainViewModel = remember(
@@ -92,6 +103,24 @@ fun AppNavigation(
         )
     }
 
+    val limitsViewModel = remember(
+        appDiscoveryRepository,
+        selectedAppsRepository,
+        dailyLimitRepository,
+        usageStatsRepository,
+        commitmentLockRepository
+    ) {
+        LimitsViewModel(
+            appDiscoveryRepository = appDiscoveryRepository,
+            selectedAppsRepository = selectedAppsRepository,
+            dailyLimitRepository = dailyLimitRepository,
+            usageStatsRepository = usageStatsRepository,
+            usageRuleEngine = ServiceLocator.getUsageRuleEngine(),
+            commitmentLockRepository = commitmentLockRepository,
+            commitmentRuleEngine = ServiceLocator.getCommitmentRuleEngine()
+        )
+    }
+
     // Refresh protection health, check midnight transitions, and clean up expired midnight triggers when resuming to foreground
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -99,11 +128,20 @@ fun AppNavigation(
                 enforcementTriggerRepository.checkAndExpireStaleTriggers()
                 commitmentLockRepository.checkAndApplyMidnightTransitions()
                 mainViewModel.refreshDashboard(context)
+                limitsViewModel.refresh()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(currentScreen) {
+        if (currentScreen is Screen.Limits) {
+            limitsViewModel.refresh()
+        } else if (currentScreen is Screen.Main) {
+            mainViewModel.refreshDashboard(context)
         }
     }
 
@@ -133,7 +171,7 @@ fun AppNavigation(
                 },
                 onNavigateToAppSelection = {
                     previousScreen = Screen.Main
-                    currentScreen = Screen.AppSelection
+                    currentScreen = Screen.Limits
                 },
                 onNavigateToUsage = {
                     previousScreen = Screen.Main
@@ -141,10 +179,14 @@ fun AppNavigation(
                 },
                 onNavigateToLimits = {
                     previousScreen = Screen.Main
-                    currentScreen = Screen.UsageTracking
+                    currentScreen = Screen.Limits
                 },
                 onNavigateToAccessibilityConsent = {
+                    previousScreen = Screen.Main
                     currentScreen = Screen.AccessibilityConsent
+                },
+                onNavigateToSettings = {
+                    showThemeDialog = true
                 },
                 onGrantUsageAccess = {
                     mainViewModel.openUsageAccessSettings(context)
@@ -166,7 +208,47 @@ fun AppNavigation(
                 }
             )
         }
+        is Screen.Limits -> {
+            BackHandler {
+                currentScreen = Screen.Main
+            }
+
+            LimitsScreen(
+                viewModel = limitsViewModel,
+                onNavigateBack = {
+                    currentScreen = Screen.Main
+                },
+                onRequestUsagePermission = {
+                    mainViewModel.openUsageAccessSettings(context)
+                },
+                bottomBar = {
+                    ScrollStopBottomNav(
+                        currentDestination = BottomNavDestination.LIMITS,
+                        onDestinationSelected = { destination ->
+                            when (destination) {
+                                BottomNavDestination.HOME -> {
+                                    currentScreen = Screen.Main
+                                }
+                                BottomNavDestination.LIMITS -> {
+                                    // Already on Limits destination
+                                }
+                                BottomNavDestination.HISTORY -> {
+                                    currentScreen = Screen.Main
+                                }
+                                BottomNavDestination.SETTINGS -> {
+                                    showThemeDialog = true
+                                }
+                            }
+                        }
+                    )
+                }
+            )
+        }
         is Screen.AppSelection -> {
+            BackHandler {
+                currentScreen = previousScreen
+            }
+
             val viewModel = remember(appDiscoveryRepository, selectedAppsRepository, commitmentLockRepository) {
                 AppSelectionViewModel(appDiscoveryRepository, selectedAppsRepository, commitmentLockRepository)
             }
@@ -182,6 +264,10 @@ fun AppNavigation(
             )
         }
         is Screen.UsageTracking -> {
+            BackHandler {
+                currentScreen = Screen.Main
+            }
+
             val viewModel = remember(usageStatsRepository, appDiscoveryRepository, selectedAppsRepository, dailyLimitRepository, commitmentLockRepository) {
                 UsageViewModel(
                     usageStatsRepository = usageStatsRepository,
@@ -212,6 +298,10 @@ fun AppNavigation(
             )
         }
         is Screen.AccessibilityConsent -> {
+            BackHandler {
+                currentScreen = Screen.Main
+            }
+
             val viewModel = remember(healthRepository, enforcementTriggerRepository) {
                 AccessibilityConsentViewModel(healthRepository, enforcementTriggerRepository)
             }
@@ -252,5 +342,17 @@ fun AppNavigation(
                 }
             )
         }
+    }
+
+    if (showThemeDialog) {
+        val currentThemeMode by themeRepository.themeModeFlow.collectAsState()
+        ThemeSelectionDialog(
+            currentThemeMode = currentThemeMode,
+            onThemeSelected = { mode ->
+                themeRepository.setThemeMode(mode)
+                showThemeDialog = false
+            },
+            onDismiss = { showThemeDialog = false }
+        )
     }
 }

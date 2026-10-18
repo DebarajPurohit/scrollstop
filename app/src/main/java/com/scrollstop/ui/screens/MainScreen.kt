@@ -75,6 +75,7 @@ import com.scrollstop.ui.components.ScrollStopBottomNav
 import com.scrollstop.ui.components.ScrollStopTopBar
 import com.scrollstop.ui.components.SevenDayChartState
 import com.scrollstop.ui.components.SevenDayUsageChart
+import com.scrollstop.ui.components.ThemeSelectionDialog
 import com.scrollstop.ui.components.UsageProgressBar
 import com.scrollstop.ui.theme.StopDoomScrollTheme
 import com.scrollstop.ui.theme.ThemeMode
@@ -100,6 +101,7 @@ fun MainScreen(
     onNavigateToUsage: () -> Unit = {},
     onNavigateToLimits: () -> Unit = onNavigateToUsage,
     onNavigateToAccessibilityConsent: () -> Unit = {},
+    onNavigateToSettings: (() -> Unit)? = null,
     onGrantUsageAccess: () -> Unit = {},
     onEnableAccessibility: () -> Unit = {},
     onEnableCommitmentLock: (Boolean) -> Unit = {},
@@ -139,6 +141,8 @@ fun MainScreen(
     var showVisualPreviewDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
 
+    val openSettings = onNavigateToSettings ?: { showThemeDialog = true }
+
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -154,71 +158,13 @@ fun MainScreen(
     }
 
     if (showThemeDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showThemeDialog = false },
-            title = {
-                Text(
-                    text = "Theme & Appearance",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+        ThemeSelectionDialog(
+            currentThemeMode = currentThemeMode,
+            onThemeSelected = { mode ->
+                resolvedThemeRepo.setThemeMode(mode)
+                showThemeDialog = false
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Choose your preferred theme for Stop Doom Scroll:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    listOf(
-                        Triple(ThemeMode.SYSTEM, "System default", "Follows device dark/light setting"),
-                        Triple(ThemeMode.LIGHT, "Light", "Clean Slate/Emerald palette on white"),
-                        Triple(ThemeMode.DARK, "Dark", "Deep Slate/Emerald dark mode")
-                    ).forEach { (mode, title, description) ->
-                        val isSelected = currentThemeMode == mode
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    resolvedThemeRepo.setThemeMode(mode)
-                                    showThemeDialog = false
-                                }
-                                .padding(vertical = 8.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = {
-                                    resolvedThemeRepo.setThemeMode(mode)
-                                    showThemeDialog = false
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = description,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showThemeDialog = false }) {
-                    Text("Done")
-                }
-            }
+            onDismiss = { showThemeDialog = false }
         )
     }
 
@@ -287,7 +233,7 @@ fun MainScreen(
                         )
                     }
                     IconButton(
-                        onClick = { showThemeDialog = true },
+                        onClick = openSettings,
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
@@ -319,7 +265,7 @@ fun MainScreen(
                             }
                         }
                         BottomNavDestination.SETTINGS -> {
-                            showThemeDialog = true
+                            openSettings()
                         }
                     }
                 }

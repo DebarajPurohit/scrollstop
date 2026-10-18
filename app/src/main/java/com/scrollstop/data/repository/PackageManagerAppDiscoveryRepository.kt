@@ -76,12 +76,17 @@ class PackageManagerAppDiscoveryRepository(
                     null
                 }
 
+                // Extract OS category (API 26+)
+                val category = mainInfo.activityInfo?.applicationInfo?.category
+                    ?: android.content.pm.ApplicationInfo.CATEGORY_UNDEFINED
+
                 discoveredApps.add(
                     DiscoveredApp(
                         packageName = packageName,
                         appLabel = label,
                         icon = icon,
-                        isSelected = false
+                        isSelected = false,
+                        category = category
                     )
                 )
             }

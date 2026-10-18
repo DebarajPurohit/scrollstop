@@ -193,6 +193,19 @@ object ServiceLocator {
     @Volatile
     private var themeRepository: com.scrollstop.data.repository.ThemeRepository? = null
 
+    @Volatile
+    private var appDiscoveryRepository: com.scrollstop.data.repository.AppDiscoveryRepository? = null
+
+    fun getAppDiscoveryRepository(context: Context): com.scrollstop.data.repository.AppDiscoveryRepository {
+        return appDiscoveryRepository ?: synchronized(this) {
+            appDiscoveryRepository ?: com.scrollstop.data.repository.PackageManagerAppDiscoveryRepository(
+                context.applicationContext
+            ).also {
+                appDiscoveryRepository = it
+            }
+        }
+    }
+
     fun getThemeRepository(context: Context): com.scrollstop.data.repository.ThemeRepository {
         return themeRepository ?: synchronized(this) {
             themeRepository ?: com.scrollstop.data.repository.SharedPreferencesThemeRepository(
@@ -214,7 +227,8 @@ object ServiceLocator {
         liveEngine: com.scrollstop.domain.detection.LiveLimitEnforcementEngine? = null,
         commitmentLockRepo: com.scrollstop.data.repository.CommitmentLockRepository? = null,
         commitmentRules: com.scrollstop.domain.rules.CommitmentRuleEngine? = null,
-        themeRepo: com.scrollstop.data.repository.ThemeRepository? = null
+        themeRepo: com.scrollstop.data.repository.ThemeRepository? = null,
+        appDiscoveryRepo: com.scrollstop.data.repository.AppDiscoveryRepository? = null
     ) {
         selectedAppsRepository = selectedAppsRepo
         dailyLimitRepository = dailyLimitRepo
@@ -227,5 +241,6 @@ object ServiceLocator {
         commitmentLockRepository = commitmentLockRepo
         commitmentRuleEngine = commitmentRules
         themeRepository = themeRepo
+        appDiscoveryRepository = appDiscoveryRepo
     }
 }

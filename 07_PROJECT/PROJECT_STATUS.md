@@ -1,13 +1,39 @@
 # Project Status
 
 **Date:** 2026-10-18\
-**Stage:** Step 2: Limit Configuration Sheet / Modal Complete (274 AUTOMATED TESTS PASS)
+**Stage:** Step 4: Navigation Integration Complete (303 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Step 4: Navigation Integration**: PASS
+  - Integrated the unified [`LimitsScreen`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitsScreen.kt) into [`AppNavigation.kt`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/navigation/AppNavigation.kt):
+    - Added `data object Limits : Screen` destination to `Screen` sealed interface.
+    - Wired Home dashboard actions (`onNavigateToLimits`, `onNavigateToAppSelection`, "+ Add" / "Choose apps" CTA, and "Configure Limits & Add Apps" button) to navigate directly to the dedicated `Screen.Limits`.
+    - Integrated bottom navigation: BottomNav item for `LIMITS` now opens `LimitsScreen` with `BottomNavDestination.LIMITS` selected; repeated taps on Limits retain the destination without back-stack duplication or screen re-creation.
+    - Wired History bottom-nav tab from Limits to navigate to Home, and Settings tab to trigger the uniform theme picker.
+    - Extracted and unified [`ThemeSelectionDialog`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/components/ThemeSelectionDialog.kt) for consistent Settings access across both Home and Limits destinations.
+    - Added hardware/system `BackHandler` support on `LimitsScreen` (returning to Home dashboard), as well as on `Screen.AppSelection`, `Screen.UsageTracking`, and `Screen.AccessibilityConsent`.
+    - Retained all legacy and critical routes intact: `Screen.AppSelection`, `Screen.UsageTracking`, `Screen.AccessibilityConsent`, and `Screen.Blocking`.
+    - Lifecycle & State Handling: Instantiated a single `LimitsViewModel` scoped to `AppNavigation`, refreshed via `LaunchedEffect(currentScreen)` on navigation arrival and on `ON_RESUME` lifecycle events, preventing stale UI or lost in-flight operations.
+    - Exposed `getAppDiscoveryRepository(context)` in `ServiceLocator` with mock injection support in `resetForTesting(...)` for robust, deterministic testing.
+  - Automated verification: 13 comprehensive integration and navigation tests in [`AppNavigationTest`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/test/java/com/scrollstop/navigation/AppNavigationTest.kt).
+  - Test suite results: 303 total automated tests pass with 0 failures; `assembleDebug` (44s) and `assembleRelease` (1m 55s, R8 + lintVital) succeed cleanly.
+- **Stop Doom Scroll — Step 3: Unified Limits & Apps Screen**: PASS
+  - Built the unified [`LimitsScreen`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitsScreen.kt) adhering to `UI_SPEC.md` §3.4 and design system standards:
+    - **Header**: ScrollStopTopBar with title ("Limits & Apps"), subtitle explaining daily usage limits, and a manual refresh action.
+    - **Commitment Lock Banner**: Displays active/inactive lock status with `ProtectionStatusBadge`. Explains immediate tightening vs. staged relaxing/removal until midnight (12:00 AM). Dismissible notice banner for active staged operations.
+    - **Search Bar**: Real-time app search matching display label or package name substring, clear search query action button, and contextual empty state with a "Clear search query" button.
+    - **Category & Filter Controls**: Chips for "All", "Controlled", and "Social & Video". Implemented genuine Android OS category detection using `ApplicationInfo.category` on API 26+ (`CATEGORY_SOCIAL = 4`, `CATEGORY_VIDEO = 2`) through `PackageManagerAppDiscoveryRepository`, handling unsupported/undefined categories honestly without guesswork or hardcoded lists.
+    - **App Row Items**: Card presenting app icon thumbnail, title label, package name, monitoring checkbox, today's usage, configured daily limit, remaining time / over-limit state, visually capped progress bar with commitment message, and "Set limit" / "Edit limit" action button.
+    - **Staged Change Indicators & Cancellation**: Warning badges for "Removal at midnight" with explicit "Keep controlled" cancellation button, and "New limit at midnight: X".
+    - **Modal Integration**: Embedded `LimitConfigurationModal` integration for opening and saving limit adjustments or cancelling staged increases.
+    - **Comprehensive States**: Gracefully handles loading, usage permission required, catalog empty, controlled empty, search empty, category empty, and error retry states.
+  - Automated verification: 15 comprehensive UI and component tests in [`LimitsScreenTest`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/test/java/com/scrollstop/ui/screens/limits/LimitsScreenTest.kt) and category unit tests in [`LimitsViewModelTest`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/test/java/com/scrollstop/ui/screens/limits/LimitsViewModelTest.kt).
+  - Test suite results: 290 total automated tests pass with 0 failures; `assembleDebug` (28s) and `assembleRelease` (1m 31s, R8 + lintVital) succeed cleanly.
+  - Step 4 navigation wiring has NOT been started.
 - **Stop Doom Scroll — Step 2: Limit Configuration Sheet / Modal**: PASS
   - Built the unified limit configuration editor [`LimitConfigurationModal`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitConfigurationModal.kt) and composable content [`LimitConfigurationContent`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitConfigurationModal.kt#L104) conforming to `UI_SPEC.md` §3.5 and ScrollStop design tokens.
   - Implemented features:
@@ -238,13 +264,14 @@
 
 ## Pending
 
+- Physical-device validation of the integrated Limits & Apps navigation (bottom nav switching, Home CTA routing, back gestures, limit editing, and app monitoring toggles).
 - Multi-OEM battery restriction handling & device matrix testing (Phase 6):
   - Testing behavior across aggressive OEM battery management implementations (Xiaomi MIUI/HyperOS, Samsung OneUI, Oppo ColorOS, Vivo FuntouchOS).
 - Remaining production-readiness checks and Google Play submission preparations.
 
 ## Current Next Action
 
-Execute multi-OEM battery restriction testing and proceed with remaining production-readiness checks on the target device matrix.
+Execute physical-device validation for Step 4 navigation integration, followed by multi-OEM battery testing and production readiness.
 
 ## Documentation Rule
 
