@@ -1,13 +1,41 @@
 # Project Status
 
 **Date:** 2026-10-18\
-**Stage:** Limit Multiplier Replaced With Commitment Message (240 AUTOMATED TESTS PASS — PRESENTATION-ONLY CHANGE)
+**Stage:** Step 2: Limit Configuration Sheet / Modal Complete (274 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Step 2: Limit Configuration Sheet / Modal**: PASS
+  - Built the unified limit configuration editor [`LimitConfigurationModal`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitConfigurationModal.kt) and composable content [`LimitConfigurationContent`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitConfigurationModal.kt#L104) conforming to `UI_SPEC.md` §3.5 and ScrollStop design tokens.
+  - Implemented features:
+    - App icon thumbnail, title label, package name, and current configured limit badge.
+    - Standard production preset pills: `15 min`, `30 min`, `45 min`, `1 hour`, `1.5 hours`, `2 hours`.
+    - Preserved `2 min (Test)` debug limit available conditionally via `showDebugPresets = BuildConfig.DEBUG` (strictly excluded in production builds).
+    - Custom duration picker: hours and minutes numeric input with quick steppers, real-time input validation (minimum 1 minute, maximum 24 hours, non-negative numbers).
+    - Plain-language Commitment Lock rules explanation:
+      - Tightening: "Decreasing your limit strengthens your protection and takes effect immediately."
+      - Relaxing while locked: "Commitment Lock is active. Increasing your daily limit will take effect at next midnight (12:00 AM) to protect your commitment."
+      - Unchanged: "Unchanged from current daily limit."
+    - Scheduled relaxation badge & cancellation: Displays pending limit increase badge with explicit "Cancel Scheduled Change" button calling `cancelStagedLimitIncrease`.
+    - Distinct loading, validation error, and save error states without losing user's current selection.
+    - Full Light and Dark theme support using MaterialTheme color tokens and `extendedColors.warningContainer`.
+  - Automated verification: 13 new UI/unit tests in `LimitConfigurationModalTest` (274 total automated tests across suite pass with 0 failures); `assembleDebug` (20s) and `assembleRelease` (1m 6s, R8 + lintVital verified) pass cleanly.
+- **Stop Doom Scroll — Step 1: Unified Limits Data Model & ViewModel**: PASS
+  - Built unified foundation for the redesigned Limits & Apps experience combining app discovery, monitored app selection, foreground usage tracking, daily limits evaluation, real-time search, category filters, and Commitment Lock staging rules.
+  - Created presentation models and UI state in `com.scrollstop.ui.screens.limits`:
+    - `LimitsAppItem`: encapsulates package, label, icon, monitored state, today's usage, configured daily limit, remaining duration, evaluated `LimitState`, and Commitment Lock indicators (`isPendingRemoval`, `pendingLimitIncreaseMs`, `formattedPendingLimit`).
+    - `LimitsUiState`: sealed interface exposing `Loading`, `PermissionRequired`, `Empty(message)`, `Error(errorMessage)`, and `Success(...)` with real-time `searchQuery`, `activeFilter` (`ALL`, `CONTROLLED`, `SOCIAL_VIDEO`), `isCommitmentLocked`, `commitmentState`, `lockedNotice`, `selectedCount`, `totalDiscoveredCount`, and `isFilteredEmpty`.
+  - Implemented `LimitsViewModel` with testable operations:
+    - `onSearchQueryChange(query)`: Case-insensitive search matching either display label or package name substring, with trimmed whitespace handling.
+    - `onFilterSelect(filter)`: Dynamic state derivation (`ALL`, `CONTROLLED`, `SOCIAL_VIDEO`). Documented known category limitation for `SOCIAL_VIDEO` as `DiscoveredApp` currently captures launcher activities without OS category metadata.
+    - `toggleAppSelection(packageName)`: Strict adherence to `CommitmentRuleEngine` — adding an app applies immediately; removing an app while locked is blocked and staged for midnight reset. Toggling an already-staged app cancels scheduled removal.
+    - `setDailyLimit(packageName, limitMs)`: Tightening applies immediately; relaxing while locked is deferred to midnight reset with `LimitChangeResult.DeferredToMidnight`.
+    - `cancelStagedRemoval(packageName)` & `cancelStagedLimitIncrease(packageName)`: Direct cancellation operations wired to `CommitmentLockRepository`.
+    - `refresh()` & `retry()`: State reload without stale or duplicate entries.
+  - Automated verification: 21 new unit tests in `LimitsViewModelTest` (261 total unit tests across suite pass with 0 failures); `assembleDebug` (22s) and `assembleRelease` (1m 4s, R8 + lintVital verified) pass cleanly.
 - **Stop Doom Scroll — Replace Limit Multiplier With Commitment Message**: PASS
   - Presentation-only UI update: Replaced over-limit multiplier/percentage text (`12.5× your limit` / `>999%` / `125%`) with the exact commitment message: `"Respect the commitment you made to yourself."`.
   - Layout & styling: Rendered in `UsageProgressBar` using existing typography (`MaterialTheme.typography.labelSmall`, `FontWeight.SemiBold`) and error color token (`MaterialTheme.colorScheme.error`). Configured with `Modifier.fillMaxWidth()` to gracefully prevent clipping/overflow on all screen widths in both Light and Dark themes.
