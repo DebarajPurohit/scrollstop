@@ -209,14 +209,26 @@ class LimitsViewModel(
 
         return if (commitmentRuleEngine.canChangeLimitImmediately(currentLimit, limitMs, commitmentState)) {
             dailyLimitRepository.setLimitForPackage(packageName, limitMs)
+            if (!selectedAppsRepository.isSelected(packageName)) {
+                selectedAppsRepository.toggleAppSelection(packageName)
+            }
             if (commitmentState.pendingIncreasedLimits.containsKey(packageName)) {
                 commitmentLockRepository?.cancelStagedLimitIncrease(packageName)
+            }
+            if (commitmentState.pendingRemovedPackages.contains(packageName)) {
+                commitmentLockRepository?.cancelStagedAppRemoval(packageName)
             }
             currentNotice = null
             updateSuccessState()
             LimitChangeResult.AppliedImmediately
         } else {
             commitmentLockRepository?.stageLimitIncrease(packageName, limitMs)
+            if (!selectedAppsRepository.isSelected(packageName)) {
+                selectedAppsRepository.toggleAppSelection(packageName)
+            }
+            if (commitmentState.pendingRemovedPackages.contains(packageName)) {
+                commitmentLockRepository?.cancelStagedAppRemoval(packageName)
+            }
             currentNotice = "Limit increase will take effect at next midnight (12:00 AM) to protect your commitment."
             updateSuccessState()
             LimitChangeResult.DeferredToMidnight(limitMs)

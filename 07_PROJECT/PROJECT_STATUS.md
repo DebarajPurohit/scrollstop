@@ -1,13 +1,31 @@
 # Project Status
 
-**Date:** 2026-10-18\
-**Stage:** Step 4: Navigation Integration Complete (303 AUTOMATED TESTS PASS)
+**Date:** 2026-10-19\
+**Stage:** Critical Regression Resolved: Immediate Blocking (308 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Critical Regression Resolved: Immediate Blocking**: PASS
+  - **Reproduction & Symptom**:
+    - Configuring a daily limit on an unselected app (e.g. Chrome 4 minutes) and opening Chrome beyond the limit failed to trigger the blocker automatically while Chrome remained in the foreground.
+    - Reopening Stop Doom Scroll backgrounded Chrome, which caused Android OS to commit the session to aggregated stats, making blocking work only on subsequent reopenings.
+  - **Root Causes Identified & Resolved**:
+    1. **App Selection Disconnect in Limits Flow**: `LimitsViewModel.setDailyLimit` previously updated `DailyLimitRepository` but did not ensure the configured app was selected in `SelectedAppsRepository`. When Chrome was launched, `LiveLimitEnforcementEngine.onForegroundPackageChanged` inspected `selectedAppsRepository.isSelected(pkg)`, evaluated to `false`, logged `LIVE_MONITOR_UNSELECTED`, and aborted foreground monitoring immediately.
+       - *Fix*: In `LimitsViewModel.setDailyLimit`, automatically select the application in `SelectedAppsRepository` if not already selected, and cancel any pending removal if staged.
+    2. **Ongoing Session Loss in Live Usage Tracking**: While an app is actively in the foreground, `UsageStatsManager.queryAndAggregateUsageStats` buffers session data in Android OS internal memory without incrementing `totalTimeInForeground` until the session closes. `AndroidUsageStatsRepository` relied on `calculateUsageFromEvents` to track the ongoing duration, which failed due to:
+       - Screen unlock transitions via `KEYGUARD_HIDDEN` (event 18) were not handled, leaving `screenIsInteractive = false` and dropping ongoing duration.
+       - Transient internal activity switches in Chrome (e.g. `ChromeLauncherActivity` to `ChromeTabbedActivity`) emptied active activity sets when `className` was null or mismatched.
+       - Switching to other applications did not explicitly close open sessions for monitored apps in `UsageEvents`.
+       - Historical aggregated stats and live ongoing duration were combined via `maxOf(aggregatedMs, eventsMs)` rather than adding the live ongoing duration onto the OS aggregated historical baseline.
+       - *Fix*: Enhanced `calculateUsageFromEvents` in `AndroidUsageStatsRepository` to handle `KEYGUARD_HIDDEN`, isolate activities without collisions, close monitored sessions when another app resumes, and combine `maxOf(aggregatedMs + ongoingDuration, eventsMs)`.
+    3. **Unnecessary Service Info Re-registration**: `RestrictedAppAccessibilityService` previously called `setServiceInfo` with `packageNames = null` on every `selectedPackageNames` flow emission, causing unnecessary system IPC. Replaced with `evaluateCurrentForegroundApp()` to immediately detect if a newly selected app is already active in the foreground.
+  - **Automated Verification**:
+    - Added unit tests in `LimitsViewModelTest` for auto-selection on `setDailyLimit` and removal cancellation.
+    - Added unit tests in `AndroidUsageStatsRepositoryTest` for ongoing foreground duration addition over aggregated baseline, `KEYGUARD_HIDDEN` unlock handling, and cross-app session boundary closure.
+    - 308 automated tests pass (`./gradlew testDebugUnitTest`); `assembleDebug` builds cleanly (0 errors).
 - **Stop Doom Scroll — Step 4: Navigation Integration**: PASS
   - Integrated the unified [`LimitsScreen`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/ui/screens/limits/LimitsScreen.kt) into [`AppNavigation.kt`](file:///c:/Users/91700/OneDrive/Desktop/I%20am%20an%20Entrepeneur/Stop%20Doom%20Scroll/Git%20Clone/scrollstop/app/src/main/java/com/scrollstop/navigation/AppNavigation.kt):
     - Added `data object Limits : Screen` destination to `Screen` sealed interface.

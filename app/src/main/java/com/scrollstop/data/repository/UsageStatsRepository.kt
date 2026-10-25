@@ -131,6 +131,11 @@ class AndroidUsageStatsRepository(
         }
     }
 
+    private data class EventsCalculationResult(
+        val eventsUsageMap: Map<String, Long>,
+        val ongoingDurationMap: Map<String, Long>
+    )
+
     override fun getTodayUsageForPackages(packageNames: Set<String>): Result<Map<String, Long>> {
         if (!hasUsagePermission()) {
             return Result.failure(SecurityException("Usage Access permission not granted"))
@@ -146,7 +151,7 @@ class AndroidUsageStatsRepository(
             val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
                 ?: emptyMap()
 
-            val eventsCalculatedStats = calculateUsageFromEvents(
+            val calculationResult = calculateUsageFromEvents(
                 usageStatsManager = usageStatsManager,
                 packageNames = packageNames,
                 startTime = startTime,
@@ -155,8 +160,9 @@ class AndroidUsageStatsRepository(
 
             val resultMap = packageNames.associateWith { pkg ->
                 val aggregatedMs = aggregatedStats[pkg]?.totalTimeInForeground ?: 0L
-                val eventsMs = eventsCalculatedStats[pkg] ?: 0L
-                maxOf(aggregatedMs, eventsMs)
+                val eventsMs = calculationResult.eventsUsageMap[pkg] ?: 0L
+                val ongoingMs = calculationResult.ongoingDurationMap[pkg] ?: 0L
+                maxOf(aggregatedMs + ongoingMs, eventsMs)
             }
 
             Result.success(resultMap)
@@ -172,20 +178,23 @@ class AndroidUsageStatsRepository(
      * 1. Completed foreground intervals for the day.
      * 2. Live ongoing foreground intervals for the currently active app (up to [endTime]).
      * 3. Multiple activities within the same package to avoid duplicate counts or premature session closure.
+     * 4. Screen interactive recovery upon unlock (SCREEN_INTERACTIVE and KEYGUARD_HIDDEN).
      */
     private fun calculateUsageFromEvents(
         usageStatsManager: UsageStatsManager,
         packageNames: Set<String>,
         startTime: Long,
         endTime: Long
-    ): Map<String, Long> {
+    ): EventsCalculationResult {
         return try {
-            val events = usageStatsManager.queryEvents(startTime, endTime) ?: return emptyMap()
+            val events = usageStatsManager.queryEvents(startTime, endTime)
+                ?: return EventsCalculationResult(emptyMap(), emptyMap())
             val event = UsageEvents.Event()
 
             val accumulatedTimeMap = mutableMapOf<String, Long>()
             val currentSessionStartMap = mutableMapOf<String, Long>()
             val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
+            val ongoingDurationMap = mutableMapOf<String, Long>()
             var screenIsInteractive = true
 
             while (events.hasNextEvent()) {
@@ -206,7 +215,9 @@ class AndroidUsageStatsRepository(
                 }
 
                 // Handle screen interactive (screen turned on/unlocked): resume sessions for active foreground apps
-                if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE) {
+                if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE ||
+                    eventType == 18 /* KEYGUARD_HIDDEN */
+                ) {
                     screenIsInteractive = true
                     for (pkg in packageNames) {
                         val activeSet = resumedActivitiesMap[pkg]
@@ -218,9 +229,22 @@ class AndroidUsageStatsRepository(
                 }
 
                 val pkg = event.packageName ?: continue
+
+                // If another user-facing application resumes, monitored apps cannot remain in foreground
+                if (eventType == UsageEvents.Event.ACTIVITY_RESUMED && pkg !in packageNames) {
+                    for (monitoredPkg in packageNames) {
+                        resumedActivitiesMap.remove(monitoredPkg)
+                        val start = currentSessionStartMap.remove(monitoredPkg)
+                        if (start != null && eventTime > start) {
+                            accumulatedTimeMap[monitoredPkg] = (accumulatedTimeMap[monitoredPkg] ?: 0L) + (eventTime - start)
+                        }
+                    }
+                    continue
+                }
+
                 if (pkg !in packageNames) continue
 
-                val className = event.className ?: "default_activity"
+                val className = event.className ?: "activity_${event.timeStamp}"
 
                 when (eventType) {
                     UsageEvents.Event.ACTIVITY_RESUMED -> {
@@ -236,7 +260,12 @@ class AndroidUsageStatsRepository(
                     UsageEvents.Event.ACTIVITY_STOPPED -> {
                         val activeSet = resumedActivitiesMap[pkg]
                         if (activeSet != null && activeSet.isNotEmpty()) {
-                            activeSet.remove(className)
+                            if (event.className != null) {
+                                activeSet.remove(event.className)
+                            } else {
+                                val first = activeSet.firstOrNull()
+                                if (first != null) activeSet.remove(first)
+                            }
                             if (activeSet.isEmpty()) {
                                 resumedActivitiesMap.remove(pkg)
                                 val start = currentSessionStartMap.remove(pkg)
@@ -258,15 +287,19 @@ class AndroidUsageStatsRepository(
                         val start = currentSessionStartMap[pkg]
                         if (start != null && endTime > start) {
                             val ongoingDuration = endTime - start
+                            ongoingDurationMap[pkg] = ongoingDuration
                             accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + ongoingDuration
                         }
                     }
                 }
             }
 
-            accumulatedTimeMap
+            EventsCalculationResult(
+                eventsUsageMap = accumulatedTimeMap,
+                ongoingDurationMap = ongoingDurationMap
+            )
         } catch (e: Exception) {
-            emptyMap()
+            EventsCalculationResult(emptyMap(), emptyMap())
         }
     }
 
@@ -383,7 +416,7 @@ class AndroidUsageStatsRepository(
             }
 
             // Handle screen interactive (screen turned on/unlocked): resume active session if app still active
-            if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE) {
+            if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE || eventType == 18 /* KEYGUARD_HIDDEN */) {
                 screenIsInteractive = true
                 if (activeResumedPackages.isNotEmpty() && activeSessionStart == null) {
                     activeSessionStart = eventTime

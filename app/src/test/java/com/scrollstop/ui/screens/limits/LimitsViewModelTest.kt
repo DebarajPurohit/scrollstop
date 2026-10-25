@@ -481,6 +481,58 @@ class LimitsViewModelTest {
         assertEquals(4, state.apps.map { it.packageName }.distinct().size)
     }
 
+    @Test
+    fun `setDailyLimit on unselected app automatically selects the app in selectedAppsRepository`() = runTest {
+        val apps = sampleApps + DiscoveredApp("com.android.chrome", "Chrome")
+        val selectedRepo = InMemorySelectedAppsRepository()
+        val dailyLimitRepo = InMemoryDailyLimitRepository()
+        val viewModel = createDefaultViewModel(apps = apps, selectedRepo = selectedRepo, dailyLimitRepo = dailyLimitRepo)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertFalse(selectedRepo.isSelected("com.android.chrome"))
+
+        val result = viewModel.setDailyLimit("com.android.chrome", 240_000L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LimitsViewModel.LimitChangeResult.AppliedImmediately, result)
+        assertTrue(selectedRepo.isSelected("com.android.chrome"))
+        assertEquals(240_000L, dailyLimitRepo.getLimitForPackage("com.android.chrome"))
+
+        val successState = viewModel.uiState.value as LimitsUiState.Success
+        val chromeItem = successState.apps.first { it.packageName == "com.android.chrome" }
+        assertTrue(chromeItem.isSelected)
+        assertEquals(240_000L, chromeItem.limitDurationMs)
+    }
+
+    @Test
+    fun `setDailyLimit on app staged for removal cancels staged removal and keeps app controlled`() = runTest {
+        val selectedRepo = InMemorySelectedAppsRepository().apply {
+            setSelectedPackages(setOf("com.instagram.android"))
+        }
+        val commitmentRepo = FakeCommitmentLockRepository().apply {
+            updateState {
+                it.copy(
+                    isLocked = true,
+                    pendingRemovedPackages = setOf("com.instagram.android")
+                )
+            }
+        }
+        val viewModel = createDefaultViewModel(selectedRepo = selectedRepo, commitmentRepo = commitmentRepo)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // Setting a limit (tightening) should cancel staged removal and keep app selected
+        val result = viewModel.setDailyLimit("com.instagram.android", 120_000L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(LimitsViewModel.LimitChangeResult.AppliedImmediately, result)
+        assertTrue(selectedRepo.isSelected("com.instagram.android"))
+        assertFalse(commitmentRepo.commitmentState.value.pendingRemovedPackages.contains("com.instagram.android"))
+
+        val successState = viewModel.uiState.value as LimitsUiState.Success
+        val instaItem = successState.apps.first { it.packageName == "com.instagram.android" }
+        assertFalse(instaItem.isPendingRemoval)
+    }
+
     // --- Helpers ---
 
     private fun createDefaultViewModel(

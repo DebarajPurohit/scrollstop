@@ -109,7 +109,7 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         selectedPackagesJob?.cancel()
         selectedPackagesJob = serviceScope.launch {
             selectedAppsRepository.selectedPackageNames.collectLatest {
-                updateServiceConfig()
+                evaluateCurrentForegroundApp()
             }
         }
 

@@ -254,6 +254,138 @@ class AndroidUsageStatsRepositoryTest {
     }
 
     @Test
+    fun `getTodayUsageForPackages adds ongoing foreground duration on top of aggregated baseline`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "com.android.chrome"
+        val earlierStart = fakeTimeProvider.currentTime - 600_000L // 10 minutes ago
+        val earlierEnd = fakeTimeProvider.currentTime - 540_000L   // 9 minutes ago (60s session)
+        val sessionStart = fakeTimeProvider.currentTime - 240_000L // 4 minutes ago
+
+        // Closed session earlier today (60s)
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("ChromeTabbedActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(earlierStart)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("ChromeTabbedActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_PAUSED)
+                .setTimeStamp(earlierEnd)
+                .build()
+        )
+
+        // Chrome resumed 4 minutes ago and is currently in foreground
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("ChromeTabbedActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(sessionStart)
+                .build()
+        )
+
+        val result = repository.getTodayUsageForPackages(setOf(pkg))
+        assertTrue(result.isSuccess)
+        val usageMap = result.getOrThrow()
+        // Aggregated (60s) + Ongoing (240s) = 300s (300,000ms)
+        assertEquals(300_000L, usageMap[pkg])
+    }
+
+    @Test
+    fun `getTodayUsageForPackages restores interactive session on KEYGUARD_HIDDEN unlock event`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val pkg = "com.android.chrome"
+        val t0 = fakeTimeProvider.currentTime - 300_000L // 5 minutes ago: Chrome opened
+        val t1 = fakeTimeProvider.currentTime - 240_000L // 4 minutes ago: Screen turned off
+        val t2 = fakeTimeProvider.currentTime - 180_000L // 3 minutes ago: Screen unlocked (KEYGUARD_HIDDEN)
+
+        // Chrome resumed at t0
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("ChromeTabbedActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        // Screen turned off at t1
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setEventType(UsageEvents.Event.SCREEN_NON_INTERACTIVE)
+                .setTimeStamp(t1)
+                .build()
+        )
+        // Device unlocked via keyguard at t2
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setEventType(18) // KEYGUARD_HIDDEN
+                .setTimeStamp(t2)
+                .build()
+        )
+
+        val result = repository.getTodayUsageForPackages(setOf(pkg))
+        assertTrue(result.isSuccess)
+        val usageMap = result.getOrThrow()
+        // (t1 - t0 = 60s) + (currentTime - t2 = 180s) = 240s (240,000ms)
+        assertEquals(240_000L, usageMap[pkg])
+    }
+
+    @Test
+    fun `getTodayUsageForPackages correctly closes session when another app resumes`() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        val monitoredPkg = "com.android.chrome"
+        val otherPkg = "com.scrollstop"
+        val t0 = fakeTimeProvider.currentTime - 300_000L // Chrome opened
+        val t1 = fakeTimeProvider.currentTime - 120_000L // Stop Doom Scroll opened
+
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(monitoredPkg)
+                .setClass("ChromeTabbedActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t0)
+                .build()
+        )
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(otherPkg)
+                .setClass("MainActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(t1)
+                .build()
+        )
+
+        val result = repository.getTodayUsageForPackages(setOf(monitoredPkg))
+        assertTrue(result.isSuccess)
+        val usageMap = result.getOrThrow()
+        // Chrome was active from t0 to t1 (180s = 180,000ms), and stopped when Stop Doom Scroll resumed
+        assertEquals(180_000L, usageMap[monitoredPkg])
+    }
+
+    @Test
     fun `getTodayTotalUsageMs returns failure when permission not granted`() {
         Shadows.shadowOf(appOpsManager).setMode(
             AppOpsManager.OPSTR_GET_USAGE_STATS,
