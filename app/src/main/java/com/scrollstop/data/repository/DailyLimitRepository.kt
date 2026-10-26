@@ -11,6 +11,7 @@ interface DailyLimitRepository {
     fun getLimitForPackage(packageName: String): Long
     fun setLimitForPackage(packageName: String, limitMs: Long)
     fun getAllLimits(): Map<String, Long>
+    fun hasConfiguredLimit(packageName: String): Boolean
     val limitsFlow: StateFlow<Map<String, Long>>
 }
 
@@ -41,5 +42,9 @@ class InMemoryDailyLimitRepository(
 
     override fun getAllLimits(): Map<String, Long> {
         return _limits.value
+    }
+
+    override fun hasConfiguredLimit(packageName: String): Boolean {
+        return _limits.value.containsKey(packageName)
     }
 }

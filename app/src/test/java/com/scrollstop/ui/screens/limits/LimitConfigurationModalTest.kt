@@ -359,4 +359,108 @@ class LimitConfigurationModalTest {
         }
         composeTestRule.onNodeWithText("Instagram").assertIsDisplayed()
     }
+
+    @Test
+    fun equivalentPresetAndCustomDuration_produceIdenticalEffectiveLimit() {
+        var savedLimit: Long? = null
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                LimitConfigurationContent(
+                    appItem = testAppItem,
+                    showDebugPresets = false,
+                    onDismiss = {},
+                    onSaveLimit = { _, limitMs -> savedLimit = limitMs }
+                )
+            }
+        }
+
+        // 1. Select 15 min preset
+        composeTestRule.onNodeWithContentDescription("Preset 15 min").performClick()
+        composeTestRule.onNodeWithContentDescription("Selected new limit value: 15 min").assertIsDisplayed()
+
+        // 2. Switch to Custom mode - should preserve the 15 min value
+        composeTestRule.onNodeWithContentDescription("Custom duration option").performClick()
+        composeTestRule.onNodeWithContentDescription("Custom duration inputs").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Selected new limit value: 15 min").performScrollTo().assertIsDisplayed()
+
+        composeTestRule.onNodeWithContentDescription("Save limit").performScrollTo().performClick()
+        assertEquals(15 * 60 * 1000L, savedLimit)
+    }
+
+    @Test
+    fun enteringShortCustomDuration_3_minutes_savesExactDuration() {
+        var savedLimit: Long? = null
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                LimitConfigurationContent(
+                    appItem = testAppItem,
+                    showDebugPresets = false,
+                    onDismiss = {},
+                    onSaveLimit = { _, limitMs -> savedLimit = limitMs }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Custom duration option").performClick()
+        val hoursInput = composeTestRule.onNodeWithContentDescription("Custom duration hours input")
+        val minutesInput = composeTestRule.onNodeWithContentDescription("Custom duration minutes input")
+
+        hoursInput.performTextClearance()
+        hoursInput.performTextInput("0")
+        minutesInput.performTextClearance()
+        minutesInput.performTextInput("3")
+
+        composeTestRule.onNodeWithContentDescription("Selected new limit value: 3 min").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Save limit").performScrollTo().performClick()
+
+        assertEquals(3 * 60 * 1000L, savedLimit)
+    }
+
+    @Test
+    fun enteringBoundaryCustomDurations_1_minute_and_24_hours() {
+        var savedLimit: Long? = null
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                LimitConfigurationContent(
+                    appItem = testAppItem,
+                    showDebugPresets = false,
+                    onDismiss = {},
+                    onSaveLimit = { _, limitMs -> savedLimit = limitMs }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Custom duration option").performClick()
+        val hoursInput = composeTestRule.onNodeWithContentDescription("Custom duration hours input")
+        val minutesInput = composeTestRule.onNodeWithContentDescription("Custom duration minutes input")
+
+        // 1 minute (minimum valid)
+        hoursInput.performTextClearance()
+        hoursInput.performTextInput("0")
+        minutesInput.performTextClearance()
+        minutesInput.performTextInput("1")
+
+        composeTestRule.onNodeWithContentDescription("Selected new limit value: 1 min").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Save limit").performScrollTo().assertIsEnabled()
+
+        // 60 minutes in minutes input -> error
+        minutesInput.performTextClearance()
+        minutesInput.performTextInput("60")
+        composeTestRule.onNodeWithText("Minutes must be between 0 and 59.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Save limit").performScrollTo().assertIsNotEnabled()
+
+        // 24 hours (maximum valid)
+        hoursInput.performTextClearance()
+        hoursInput.performTextInput("24")
+        minutesInput.performTextClearance()
+        minutesInput.performTextInput("0")
+
+        composeTestRule.onNodeWithContentDescription("Selected new limit value: 24 hr").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Save limit").performScrollTo().assertIsEnabled().performClick()
+
+        assertEquals(24 * 60 * 60 * 1000L, savedLimit)
+    }
 }

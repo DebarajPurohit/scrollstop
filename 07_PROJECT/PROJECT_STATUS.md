@@ -1,13 +1,34 @@
 # Project Status
 
-**Date:** 2026-10-19\
-**Stage:** Critical Regression Resolved: Immediate Blocking (308 AUTOMATED TESTS PASS)
+**Date:** 2026-10-26\
+**Stage:** Custom-Duration Limit Enforcement Defect Resolved (321 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Custom-Duration Limit Enforcement Defect Resolved**: PASS
+  - **Reproduction & Symptom**:
+    - Preset enforcement (e.g. 15-minute preset blocking Chrome at ~15m 2s) worked reliably on physical devices.
+    - Custom-duration limits entered by the user appeared to fail during physical-device testing.
+  - **Root Causes Identified & Resolved**:
+    1. **Decoupled State in Custom Duration Modal (`LimitConfigurationModal.kt`)**: `selectedLimitMs` was decoupled from `customHours` and `customMinutes`. When editing custom values, intermediate states (such as backspacing or typing new digits) caused transient validation states without updating `selectedLimitMs`. Switching between preset and custom modes left the custom input strings out of sync.
+    2. **Digit Truncation on Input**: Text fields previously used `.take(2)`, which dropped typed digits if the cursor was at the end of an existing 2-digit number (e.g. typing "3" into "15" resulted in `"153".take(2)` = `"15"`).
+    3. **Save Action & Preview Divergence**: The Save button and summary card read from `selectedLimitMs` rather than directly deriving from user-entered custom hours and minutes via an authoritative `effectiveLimitMs`.
+    4. **Physical-Device Confounding Factor (Accumulated Daily Foreground Usage)**: On physical devices where Test 1 ran Chrome for 15 minutes 2 seconds, `UsageStatsManager` recorded ~902,000 ms of usage today for Chrome. When the tester subsequently configured a short custom limit (e.g. 3 minutes = 180,000 ms), `LiveLimitEnforcementEngine` immediately evaluated `usedMs (15m 2s) >= limitMs (3m)` and blocked Chrome immediately at 0 seconds. Without accounting for prior usage, this gave the false impression that custom limit enforcement failed.
+  - **Smallest Safe Fix Implemented**:
+    - In `LimitConfigurationModal.kt`:
+      - Used safe 64-bit Long arithmetic `(h * 60 + m) * 60 * 1000L` preventing integer overflow.
+      - Added `sanitizeNumberInput(newVal)` to prevent dropped keystrokes and strip awkward leading zeros.
+      - Bi-directional synchronization: Switching to Custom mode pre-fills hours/minutes from `selectedLimitMs`; selecting a preset syncs `customHours` and `customMinutes`.
+      - Derived `effectiveLimitMs = if (isCustomMode) ((h * 60 + m) * 60 * 1000L) else selectedLimitMs`, ensuring the Save button, preview text, and commitment notice always evaluate the exact user-entered custom duration.
+    - In `DailyLimitRepository.kt` & `SharedPreferencesDailyLimitRepository.kt`:
+      - Added `hasConfiguredLimit(packageName: String): Boolean` for explicit limit verification.
+  - **Automated Verification**:
+    - Added UI modal tests in `LimitConfigurationModalTest.kt`: equivalent preset vs custom parity, 3-minute custom saving, and boundary inputs (1m, 60m error, 24h).
+    - Added comprehensive regression suite in `CustomLimitEnforcementRegressionTest.kt` (10 tests covering duration calculation, persistence, navigation survival, process recreation, immediate enforcement when under-limit, non-premature enforcement when above-limit, preset baseline parity, Commitment Lock staging & cancellation, equivalence check, and input boundary validation).
+    - 321 automated unit tests pass (`./gradlew testDebugUnitTest`); `assembleDebug` and `assembleRelease` (R8 + lintVital) succeed with zero errors.
 - **Stop Doom Scroll — Critical Regression Resolved: Immediate Blocking**: PASS
   - **Reproduction & Symptom**:
     - Configuring a daily limit on an unselected app (e.g. Chrome 4 minutes) and opening Chrome beyond the limit failed to trigger the blocker automatically while Chrome remained in the foreground.
@@ -282,6 +303,7 @@
 
 ## Pending
 
+- Physical-device execution of custom-duration limit enforcement validation (reproducible test procedure documented: 3-minute custom limit accounting for today's accumulated usage).
 - Physical-device validation of the integrated Limits & Apps navigation (bottom nav switching, Home CTA routing, back gestures, limit editing, and app monitoring toggles).
 - Multi-OEM battery restriction handling & device matrix testing (Phase 6):
   - Testing behavior across aggressive OEM battery management implementations (Xiaomi MIUI/HyperOS, Samsung OneUI, Oppo ColorOS, Vivo FuntouchOS).
@@ -289,7 +311,7 @@
 
 ## Current Next Action
 
-Execute physical-device validation for Step 4 navigation integration, followed by multi-OEM battery testing and production readiness.
+Perform physical-device validation of custom-duration limits (3-minute test accounting for prior usage), then proceed with multi-OEM battery testing and production readiness.
 
 ## Documentation Rule
 

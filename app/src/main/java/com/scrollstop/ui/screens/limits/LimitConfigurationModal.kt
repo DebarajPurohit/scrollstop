@@ -170,12 +170,12 @@ fun LimitConfigurationContent(
     var validationError by remember { mutableStateOf<String?>(null) }
 
     fun updateCustomLimit(hStr: String, mStr: String) {
-        val h = hStr.toIntOrNull() ?: 0
-        val m = mStr.toIntOrNull() ?: 0
+        val h = hStr.toLongOrNull() ?: 0L
+        val m = mStr.toLongOrNull() ?: 0L
 
         val totalMs = (h * 60 + m) * 60 * 1000L
         when {
-            h < 0 || m < 0 -> {
+            h < 0L || m < 0L -> {
                 validationError = "Duration values cannot be negative."
             }
             totalMs < 60 * 1000L -> {
@@ -184,13 +184,23 @@ fun LimitConfigurationContent(
             totalMs > 24 * 60 * 60 * 1000L -> {
                 validationError = "Daily limit cannot exceed 24 hours."
             }
-            m >= 60 -> {
+            m >= 60L -> {
                 validationError = "Minutes must be between 0 and 59."
             }
             else -> {
                 validationError = null
                 selectedLimitMs = totalMs
             }
+        }
+    }
+
+    fun sanitizeNumberInput(newVal: String): String {
+        val digitsOnly = newVal.filter { it.isDigit() }
+        return when {
+            digitsOnly.isEmpty() -> ""
+            digitsOnly.length > 2 -> digitsOnly.takeLast(2)
+            digitsOnly.length == 2 && digitsOnly.startsWith("0") -> digitsOnly.substring(1)
+            else -> digitsOnly
         }
     }
 
@@ -327,6 +337,9 @@ fun LimitConfigurationContent(
                         onClick = {
                             isCustomMode = false
                             selectedLimitMs = preset.durationMs
+                            val totalMinutes = preset.durationMs / (60 * 1000L)
+                            customHours = (totalMinutes / 60).toString()
+                            customMinutes = (totalMinutes % 60).toString()
                             validationError = null
                         },
                         label = {
@@ -351,6 +364,11 @@ fun LimitConfigurationContent(
                     selected = isCustomMode,
                     onClick = {
                         isCustomMode = true
+                        if (customHours == "0" && customMinutes == "0" && selectedLimitMs >= 60 * 1000L) {
+                            val totalMinutes = selectedLimitMs / (60 * 1000L)
+                            customHours = (totalMinutes / 60).toString()
+                            customMinutes = (totalMinutes % 60).toString()
+                        }
                         updateCustomLimit(customHours, customMinutes)
                     },
                     label = {
@@ -402,9 +420,9 @@ fun LimitConfigurationContent(
                         OutlinedTextField(
                             value = customHours,
                             onValueChange = { newVal ->
-                                val filtered = newVal.filter { it.isDigit() }.take(2)
-                                customHours = filtered
-                                updateCustomLimit(filtered, customMinutes)
+                                val cleaned = sanitizeNumberInput(newVal)
+                                customHours = cleaned
+                                updateCustomLimit(cleaned, customMinutes)
                             },
                             label = { Text("Hours") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -418,9 +436,9 @@ fun LimitConfigurationContent(
                         OutlinedTextField(
                             value = customMinutes,
                             onValueChange = { newVal ->
-                                val filtered = newVal.filter { it.isDigit() }.take(2)
-                                customMinutes = filtered
-                                updateCustomLimit(customHours, filtered)
+                                val cleaned = sanitizeNumberInput(newVal)
+                                customMinutes = cleaned
+                                updateCustomLimit(customHours, cleaned)
                             },
                             label = { Text("Minutes") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -483,9 +501,17 @@ fun LimitConfigurationContent(
         }
 
         // 4. New Limit Indication & Commitment Lock Notice
-        val isTightening = selectedLimitMs < appItem.limitDurationMs
-        val isRelaxing = selectedLimitMs > appItem.limitDurationMs
-        val isUnchanged = selectedLimitMs == appItem.limitDurationMs
+        val effectiveLimitMs = if (isCustomMode) {
+            val h = customHours.toLongOrNull() ?: 0L
+            val m = customMinutes.toLongOrNull() ?: 0L
+            (h * 60 + m) * 60 * 1000L
+        } else {
+            selectedLimitMs
+        }
+
+        val isTightening = effectiveLimitMs < appItem.limitDurationMs
+        val isRelaxing = effectiveLimitMs > appItem.limitDurationMs
+        val isUnchanged = effectiveLimitMs == appItem.limitDurationMs
 
         Card(
             shape = RoundedCornerShape(14.dp),
@@ -519,11 +545,11 @@ fun LimitConfigurationContent(
                         }
                     )
                     Text(
-                        text = UsageFormatter.formatDuration(selectedLimitMs),
+                        text = UsageFormatter.formatDuration(effectiveLimitMs),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.semantics {
-                            contentDescription = "Selected new limit value: ${UsageFormatter.formatDuration(selectedLimitMs)}"
+                            contentDescription = "Selected new limit value: ${UsageFormatter.formatDuration(effectiveLimitMs)}"
                         },
                         color = when {
                             isCommitmentLocked && isRelaxing -> MaterialTheme.extendedColors.onWarningContainer
@@ -583,11 +609,11 @@ fun LimitConfigurationContent(
 
             Button(
                 onClick = {
-                    if (validationError == null && selectedLimitMs >= 60 * 1000L) {
-                        onSaveLimit(appItem.packageName, selectedLimitMs)
+                    if (validationError == null && effectiveLimitMs >= 60 * 1000L) {
+                        onSaveLimit(appItem.packageName, effectiveLimitMs)
                     }
                 },
-                enabled = !isLoading && validationError == null && selectedLimitMs >= 60 * 1000L,
+                enabled = !isLoading && validationError == null && effectiveLimitMs >= 60 * 1000L,
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 48.dp)

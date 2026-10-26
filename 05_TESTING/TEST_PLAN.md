@@ -93,6 +93,20 @@
 9.  Enforcement Recovery: process recreation from SharedPreferences preserves configured daily limits and commitment lock state
 10. Enforcement Recovery: stale triggers from previous calendar day expire cleanly across day boundaries upon service reconnection
 
+
+### Custom-Duration Limit Enforcement Test Suite
+
+1. Custom Duration Calculation: hours and minutes converted to milliseconds via safe 64-bit Long arithmetic.
+2. Custom Duration Persistence: exact custom limit stored and retrieved from `SharedPreferencesDailyLimitRepository`.
+3. Navigation Resilience: custom limit preserved in `LimitsViewModel` when navigating away and returning.
+4. Process Recreation: custom limit reloaded accurately from disk across simulated process death.
+5. Immediate Enforcement: custom limit set below current daily usage triggers blocker immediately upon app foregrounding.
+6. Non-Premature Enforcement: custom limit set above current usage allows foreground usage and triggers only when limit is reached.
+7. Preset Baseline Parity: existing presets (15m, 30m, etc.) continue to trigger accurately at boundary.
+8. Commitment Lock Interaction: custom limit increases staged until midnight; custom tightening applies immediately; staged changes cancellable.
+9. Preset & Custom Equivalence: equivalent preset (15m) and custom duration (0h 15m) evaluate to identical limit and enforcement states.
+10. Input Validation & Boundaries: zero, negative, >24h, and >=60m values rejected with user-facing validation errors; 1m and 24h accepted.
+
 ### Physical Device Validation Results (Owner-Confirmed)
 
 - **Test Device Validation (Confirmed PASS)**:

@@ -58,4 +58,8 @@ class SharedPreferencesDailyLimitRepository(
     override fun getAllLimits(): Map<String, Long> {
         return _limits.value
     }
+
+    override fun hasConfiguredLimit(packageName: String): Boolean {
+        return _limits.value.containsKey(packageName) || prefs.contains(KEY_LIMIT_PREFIX + packageName)
+    }
 }
