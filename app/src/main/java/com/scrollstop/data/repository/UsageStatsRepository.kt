@@ -80,7 +80,7 @@ class AndroidUsageStatsRepository(
 
             val endTime = timeProvider.currentTimeMillis()
             // Inspect recent events (up to 5 minutes) to detect currently active foreground app
-            val startTime = maxOf(timeProvider.getStartOfDayMillis(), endTime - 300_000L)
+            val startTime = maxOf(0L, endTime - 300_000L)
             val events = usageStatsManager.queryEvents(startTime, endTime)
 
             val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
@@ -133,7 +133,8 @@ class AndroidUsageStatsRepository(
 
     private data class EventsCalculationResult(
         val eventsUsageMap: Map<String, Long>,
-        val ongoingDurationMap: Map<String, Long>
+        val ongoingDurationMap: Map<String, Long>,
+        val hasEvents: Boolean = true
     )
 
     override fun getTodayUsageForPackages(packageNames: Set<String>): Result<Map<String, Long>> {
@@ -148,9 +149,6 @@ class AndroidUsageStatsRepository(
             val startTime = timeProvider.getStartOfDayMillis()
             val endTime = timeProvider.currentTimeMillis()
 
-            val aggregatedStats = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
-                ?: emptyMap()
-
             val calculationResult = calculateUsageFromEvents(
                 usageStatsManager = usageStatsManager,
                 packageNames = packageNames,
@@ -158,11 +156,27 @@ class AndroidUsageStatsRepository(
                 endTime = endTime
             )
 
-            val resultMap = packageNames.associateWith { pkg ->
-                val aggregatedMs = aggregatedStats[pkg]?.totalTimeInForeground ?: 0L
-                val eventsMs = calculationResult.eventsUsageMap[pkg] ?: 0L
-                val ongoingMs = calculationResult.ongoingDurationMap[pkg] ?: 0L
-                maxOf(aggregatedMs + ongoingMs, eventsMs)
+            val resultMap = if (calculationResult.hasEvents) {
+                packageNames.associateWith { pkg ->
+                    calculationResult.eventsUsageMap[pkg] ?: 0L
+                }
+            } else {
+                // Fallback for environments where queryEvents returns no events:
+                // query daily stats strictly covering today (firstTimeStamp >= startTime)
+                val dailyStats = usageStatsManager.queryUsageStats(
+                    UsageStatsManager.INTERVAL_DAILY,
+                    startTime,
+                    endTime
+                ) ?: emptyList()
+                val maxPossibleMs = maxOf(0L, endTime - startTime)
+                val packageTotals = mutableMapOf<String, Long>()
+                for (stat in dailyStats) {
+                    if (stat.firstTimeStamp >= startTime && stat.packageName in packageNames) {
+                        val current = packageTotals[stat.packageName] ?: 0L
+                        packageTotals[stat.packageName] = minOf(maxOf(current, stat.totalTimeInForeground), maxPossibleMs)
+                    }
+                }
+                packageNames.associateWith { pkg -> packageTotals[pkg] ?: 0L }
             }
 
             Result.success(resultMap)
@@ -175,10 +189,12 @@ class AndroidUsageStatsRepository(
      * Reconstructs foreground session durations directly from [UsageEvents] between [startTime] and [endTime].
      *
      * Handles:
-     * 1. Completed foreground intervals for the day.
-     * 2. Live ongoing foreground intervals for the currently active app (up to [endTime]).
-     * 3. Multiple activities within the same package to avoid duplicate counts or premature session closure.
-     * 4. Screen interactive recovery upon unlock (SCREEN_INTERACTIVE and KEYGUARD_HIDDEN).
+     * 1. Completed foreground intervals strictly belonging to today ([startTime] to [endTime]).
+     * 2. Sessions spanning across local midnight, splitting durations so that pre-midnight time is excluded
+     *    and post-midnight time is attributed to today.
+     * 3. Live ongoing foreground intervals for the currently active app (up to [endTime]).
+     * 4. Multiple activities within the same package to avoid duplicate counts or premature session closure.
+     * 5. Screen interactive recovery upon unlock (SCREEN_INTERACTIVE and KEYGUARD_HIDDEN).
      */
     private fun calculateUsageFromEvents(
         usageStatsManager: UsageStatsManager,
@@ -187,8 +203,9 @@ class AndroidUsageStatsRepository(
         endTime: Long
     ): EventsCalculationResult {
         return try {
-            val events = usageStatsManager.queryEvents(startTime, endTime)
-                ?: return EventsCalculationResult(emptyMap(), emptyMap())
+            val queryStart = maxOf(0L, startTime - 86_400_000L)
+            val events = usageStatsManager.queryEvents(queryStart, endTime)
+                ?: return EventsCalculationResult(emptyMap(), emptyMap(), hasEvents = false)
             val event = UsageEvents.Event()
 
             val accumulatedTimeMap = mutableMapOf<String, Long>()
@@ -196,19 +213,25 @@ class AndroidUsageStatsRepository(
             val resumedActivitiesMap = mutableMapOf<String, MutableSet<String>>()
             val ongoingDurationMap = mutableMapOf<String, Long>()
             var screenIsInteractive = true
+            var sawAnyEvent = false
 
             while (events.hasNextEvent()) {
                 events.getNextEvent(event)
+                sawAnyEvent = true
                 val eventType = event.eventType
-                val eventTime = event.timeStamp.coerceIn(startTime, endTime)
+                val eventTime = event.timeStamp.coerceIn(queryStart, endTime)
 
                 // Handle screen non-interactive (screen off): close active sessions at event timestamp
                 if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
                     screenIsInteractive = false
                     for (pkg in packageNames) {
                         val start = currentSessionStartMap.remove(pkg)
-                        if (start != null && eventTime > start) {
-                            accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + (eventTime - start)
+                        if (start != null) {
+                            val effectiveStart = maxOf(start, startTime)
+                            val effectiveEnd = minOf(eventTime, endTime)
+                            if (effectiveEnd > effectiveStart) {
+                                accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + (effectiveEnd - effectiveStart)
+                            }
                         }
                     }
                     continue
@@ -235,8 +258,12 @@ class AndroidUsageStatsRepository(
                     for (monitoredPkg in packageNames) {
                         resumedActivitiesMap.remove(monitoredPkg)
                         val start = currentSessionStartMap.remove(monitoredPkg)
-                        if (start != null && eventTime > start) {
-                            accumulatedTimeMap[monitoredPkg] = (accumulatedTimeMap[monitoredPkg] ?: 0L) + (eventTime - start)
+                        if (start != null) {
+                            val effectiveStart = maxOf(start, startTime)
+                            val effectiveEnd = minOf(eventTime, endTime)
+                            if (effectiveEnd > effectiveStart) {
+                                accumulatedTimeMap[monitoredPkg] = (accumulatedTimeMap[monitoredPkg] ?: 0L) + (effectiveEnd - effectiveStart)
+                            }
                         }
                     }
                     continue
@@ -269,10 +296,21 @@ class AndroidUsageStatsRepository(
                             if (activeSet.isEmpty()) {
                                 resumedActivitiesMap.remove(pkg)
                                 val start = currentSessionStartMap.remove(pkg)
-                                if (start != null && eventTime > start) {
-                                    val sessionDuration = eventTime - start
-                                    accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + sessionDuration
+                                if (start != null) {
+                                    val effectiveStart = maxOf(start, startTime)
+                                    val effectiveEnd = minOf(eventTime, endTime)
+                                    if (effectiveEnd > effectiveStart) {
+                                        val sessionDuration = effectiveEnd - effectiveStart
+                                        accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + sessionDuration
+                                    }
                                 }
+                            }
+                        } else {
+                            // Session began before query window or orphan pause event:
+                            val effectiveStart = startTime
+                            val effectiveEnd = minOf(eventTime, endTime)
+                            if (effectiveEnd > effectiveStart) {
+                                accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + (effectiveEnd - effectiveStart)
                             }
                         }
                     }
@@ -285,10 +323,13 @@ class AndroidUsageStatsRepository(
                     val activeSet = resumedActivitiesMap[pkg]
                     if (activeSet != null && activeSet.isNotEmpty()) {
                         val start = currentSessionStartMap[pkg]
-                        if (start != null && endTime > start) {
-                            val ongoingDuration = endTime - start
-                            ongoingDurationMap[pkg] = ongoingDuration
-                            accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + ongoingDuration
+                        if (start != null) {
+                            val effectiveStart = maxOf(start, startTime)
+                            if (endTime > effectiveStart) {
+                                val ongoingDuration = endTime - effectiveStart
+                                ongoingDurationMap[pkg] = ongoingDuration
+                                accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + ongoingDuration
+                            }
                         }
                     }
                 }
@@ -296,10 +337,11 @@ class AndroidUsageStatsRepository(
 
             EventsCalculationResult(
                 eventsUsageMap = accumulatedTimeMap,
-                ongoingDurationMap = ongoingDurationMap
+                ongoingDurationMap = ongoingDurationMap,
+                hasEvents = sawAnyEvent
             )
         } catch (e: Exception) {
-            EventsCalculationResult(emptyMap(), emptyMap())
+            EventsCalculationResult(emptyMap(), emptyMap(), hasEvents = false)
         }
     }
 
@@ -386,7 +428,8 @@ class AndroidUsageStatsRepository(
         startTime: Long,
         endTime: Long
     ): Long? {
-        val events = usageStatsManager.queryEvents(startTime, endTime) ?: return null
+        val queryStart = maxOf(0L, startTime - 86_400_000L)
+        val events = usageStatsManager.queryEvents(queryStart, endTime) ?: return null
         if (!events.hasNextEvent()) return null
 
         val launcherPackages = getExcludedLauncherPackages()
@@ -402,14 +445,18 @@ class AndroidUsageStatsRepository(
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
             val eventType = event.eventType
-            val eventTime = event.timeStamp.coerceIn(startTime, endTime)
+            val eventTime = event.timeStamp.coerceIn(queryStart, endTime)
             val pkg = event.packageName
 
             // Handle screen non-interactive (screen off): close any active session at event timestamp
             if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
                 screenIsInteractive = false
-                if (activeSessionStart != null && eventTime > activeSessionStart) {
-                    accumulatedTimeMs += (eventTime - activeSessionStart)
+                if (activeSessionStart != null) {
+                    val effectiveStart = maxOf(activeSessionStart, startTime)
+                    val effectiveEnd = minOf(eventTime, endTime)
+                    if (effectiveEnd > effectiveStart) {
+                        accumulatedTimeMs += (effectiveEnd - effectiveStart)
+                    }
                     activeSessionStart = null
                 }
                 continue
@@ -449,29 +496,35 @@ class AndroidUsageStatsRepository(
                             resumedActivitiesMap.remove(pkg)
                             activeResumedPackages.remove(pkg)
                         }
-                    } else if (activeResumedPackages.isEmpty() && activeSessionStart == null && accumulatedTimeMs == 0L) {
-                        // Edge case: App was opened before startTime and paused after startTime
-                        val durationBeforePause = eventTime - startTime
-                        if (durationBeforePause > 0L) {
-                            accumulatedTimeMs += durationBeforePause
-                        }
                     } else {
                         activeResumedPackages.remove(pkg)
                     }
 
                     if (activeResumedPackages.isEmpty() && activeSessionStart != null) {
-                        if (eventTime > activeSessionStart) {
-                            accumulatedTimeMs += (eventTime - activeSessionStart)
+                        val effectiveStart = maxOf(activeSessionStart, startTime)
+                        val effectiveEnd = minOf(eventTime, endTime)
+                        if (effectiveEnd > effectiveStart) {
+                            accumulatedTimeMs += (effectiveEnd - effectiveStart)
                         }
                         activeSessionStart = null
+                    } else if (activeSessionStart == null) {
+                        // Session began before query window or orphan pause event:
+                        val effectiveStart = startTime
+                        val effectiveEnd = minOf(eventTime, endTime)
+                        if (effectiveEnd > effectiveStart) {
+                            accumulatedTimeMs += (effectiveEnd - effectiveStart)
+                        }
                     }
                 }
             }
         }
 
         // Include ongoing active session if the device is currently in foreground use at endTime and screen is interactive
-        if (screenIsInteractive && activeResumedPackages.isNotEmpty() && activeSessionStart != null && endTime > activeSessionStart) {
-            accumulatedTimeMs += (endTime - activeSessionStart)
+        if (screenIsInteractive && activeResumedPackages.isNotEmpty() && activeSessionStart != null) {
+            val effectiveStart = maxOf(activeSessionStart, startTime)
+            if (endTime > effectiveStart) {
+                accumulatedTimeMs += (endTime - effectiveStart)
+            }
         }
 
         val maxPossible = maxOf(0L, endTime - startTime)
@@ -508,7 +561,7 @@ class AndroidUsageStatsRepository(
                 ) ?: emptyList()
 
                 val filteredStats = dailyStats.filter {
-                    !isExcludedFromDeviceUsage(it.packageName, launcherPackages, imePackages)
+                    it.firstTimeStamp >= startTime && !isExcludedFromDeviceUsage(it.packageName, launcherPackages, imePackages)
                 }
 
                 // Consolidate foreground times per unique package to eliminate duplicate bucket intervals

@@ -64,7 +64,11 @@ class SharedPreferencesEnforcementTriggerRepository(
     override val triggerFlow: SharedFlow<EnforcementTrigger> = _triggerFlow.asSharedFlow()
 
     private val _latestTrigger = MutableStateFlow<EnforcementTrigger?>(readTriggerFromPrefs())
-    override val latestTrigger: StateFlow<EnforcementTrigger?> = _latestTrigger.asStateFlow()
+    override val latestTrigger: StateFlow<EnforcementTrigger?>
+        get() {
+            checkAndExpireStaleTriggers()
+            return _latestTrigger.asStateFlow()
+        }
 
     private val _diagnosticInfo = MutableStateFlow<DiagnosticInfo>(readDiagnosticFromPrefs())
     override val diagnosticInfo: StateFlow<DiagnosticInfo> = _diagnosticInfo.asStateFlow()
@@ -188,7 +192,10 @@ class SharedPreferencesEnforcementTriggerRepository(
 
     override fun checkAndExpireStaleTriggers() {
         val wallClockTime = prefs.getLong(KEY_WALL_CLOCK_TIME_MS, 0L)
-        if (wallClockTime > 0L && wallClockTime < timeProvider.getStartOfDayMillis()) {
+        val hasPackage = prefs.contains(KEY_PACKAGE_NAME)
+        if (!hasPackage && _latestTrigger.value != null) {
+            _latestTrigger.value = null
+        } else if (wallClockTime > 0L && wallClockTime < timeProvider.getStartOfDayMillis()) {
             safeLogD(TAG, "TRIGGER_EXPIRED_MIDNIGHT wallClock=$wallClockTime midnight=${timeProvider.getStartOfDayMillis()}")
             clearLatestTrigger()
         }

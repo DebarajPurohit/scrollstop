@@ -118,6 +118,9 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
     }
 
     internal fun evaluateCurrentForegroundApp() {
+        enforcementTriggerRepository.checkAndExpireStaleTriggers()
+        commitmentLockRepository.checkAndApplyMidnightTransitions()
+
         if (!usageStatsRepository.hasUsagePermission()) {
             safeLogD(TAG, "EVALUATE_FOREGROUND_SKIPPED missing_usage_permission")
             return
@@ -161,6 +164,11 @@ class RestrictedAppAccessibilityService : AccessibilityService() {
         val eventPkg = event.packageName?.toString() ?: return
 
         safeLogD(TAG, "SERVICE_EVENT package=$eventPkg")
+
+        // Evaluate midnight transitions and expire stale previous-day triggers
+        enforcementTriggerRepository.checkAndExpireStaleTriggers()
+        commitmentLockRepository.checkAndApplyMidnightTransitions()
+
         enforcementTriggerRepository.recordEvent(eventPkg)
 
         // Delegate foreground package transitions to LiveLimitEnforcementEngine (POC-05 & POC-05A)

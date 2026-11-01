@@ -78,6 +78,8 @@ class LiveLimitEnforcementEngine(
         var immediateTrigger: EnforcementTrigger? = null
 
         synchronized(lock) {
+            enforcementTriggerRepository.checkAndExpireStaleTriggers()
+
             if (packageName.isNullOrBlank()) {
                 if (currentMonitoredPackage != null) {
                     safeLogD(TAG, "LIVE_MONITOR_TRANSIENT_BLANK_PACKAGE activeMonitor=$currentMonitoredPackage")
@@ -180,6 +182,7 @@ class LiveLimitEnforcementEngine(
 
                 var reachedTrigger: EnforcementTrigger? = null
                 synchronized(lock) {
+                    enforcementTriggerRepository.checkAndExpireStaleTriggers()
                     if (currentMonitoredPackage != pkg) return@launch
 
                     if (!selectedAppsRepository.isSelected(pkg)) {

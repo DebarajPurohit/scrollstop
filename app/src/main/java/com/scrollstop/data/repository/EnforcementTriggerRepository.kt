@@ -1,5 +1,7 @@
 package com.scrollstop.data.repository
 
+import com.scrollstop.data.time.SystemTimeProvider
+import com.scrollstop.data.time.TimeProvider
 import com.scrollstop.domain.model.EnforcementTrigger
 import com.scrollstop.domain.rules.LimitState
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -64,7 +66,9 @@ interface EnforcementTriggerRepository {
 /**
  * In-memory implementation of [EnforcementTriggerRepository] for unit testing.
  */
-class InMemoryEnforcementTriggerRepository : EnforcementTriggerRepository {
+class InMemoryEnforcementTriggerRepository(
+    private val timeProvider: TimeProvider = SystemTimeProvider()
+) : EnforcementTriggerRepository {
 
     private val _triggerFlow = MutableSharedFlow<EnforcementTrigger>(replay = 1)
     override val triggerFlow: SharedFlow<EnforcementTrigger> = _triggerFlow.asSharedFlow()
@@ -75,17 +79,23 @@ class InMemoryEnforcementTriggerRepository : EnforcementTriggerRepository {
     private val _diagnosticInfo = MutableStateFlow(DiagnosticInfo())
     override val diagnosticInfo: StateFlow<DiagnosticInfo> = _diagnosticInfo.asStateFlow()
 
+    private var lastTriggerWallClockTime: Long = 0L
+
     override fun emitTrigger(trigger: EnforcementTrigger) {
+        lastTriggerWallClockTime = timeProvider.currentTimeMillis()
         _latestTrigger.value = trigger
         _triggerFlow.tryEmit(trigger)
     }
 
     override fun clearLatestTrigger() {
+        lastTriggerWallClockTime = 0L
         _latestTrigger.value = null
     }
 
     override fun checkAndExpireStaleTriggers() {
-        // No-op for in-memory implementation
+        if (lastTriggerWallClockTime > 0L && lastTriggerWallClockTime < timeProvider.getStartOfDayMillis()) {
+            clearLatestTrigger()
+        }
     }
 
     override fun recordEvent(packageName: String) {

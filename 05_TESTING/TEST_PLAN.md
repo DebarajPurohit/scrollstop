@@ -169,6 +169,21 @@
   - Renders calm, distraction-free "Time's up" screen with app label, reached limit, and midnight reset notice.
   - BackHandler intercepts physical back button and navigates safely to Home Dashboard.
 
+### Daily Midnight Reset Regression Test Suite (MidnightResetRegressionTest)
+
+1.  **Regression 01**: Monitored app usage from previous day (prior to local midnight) is strictly excluded after midnight reset.
+2.  **Regression 02**: Overall phone usage and per-app usage use the identical local calendar day boundary (`timeProvider.getStartOfDayMillis()`).
+3.  **Regression 03**: Stale daily-limit enforcement triggers from previous days automatically expire and clear on the new day.
+4.  **Regression 04**: An app blocked yesterday is immediately usable today once today's usage starts at 0 below the daily limit.
+5.  **Regression 05**: Continuous foreground session active across midnight is accurately split at 00:00:00 local time, attributing only post-midnight duration to the new day.
+6.  **Regression 06**: When new day's usage reaches the configured daily limit, the app is blocked automatically without restarting the app.
+7.  **Regression 07**: Staged Commitment Lock limit increases activate at midnight boundary while preserving the lock itself.
+8.  **Regression 08**: Staged Commitment Lock app removals activate at midnight boundary.
+9.  **Regression 09**: Cancelled staged changes remain cancelled and do not take effect when midnight arrives.
+10. **Regression 10**: App process death or AccessibilityService recreation after midnight does not restore yesterday's blocking state.
+11. **Regression 11**: Manual date changes and timezone shifts (e.g. DST, travel) are dynamically handled without stale cached offsets.
+12. **Regression 12**: Both 15-minute preset and custom-duration limit enforcement continue to function reliably.
+
 ## Critical Enforcement
 
 -   Limit reached while app is open

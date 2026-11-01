@@ -1,13 +1,31 @@
 # Project Status
 
-**Date:** 2026-10-26\
-**Stage:** Custom-Duration Limit Enforcement Defect Resolved (321 AUTOMATED TESTS PASS)
+**Date:** 2026-11-01\
+**Stage:** Daily Midnight Reset Regression Resolved (333 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Critical Daily Midnight Reset Regression Resolved**: PASS
+  - **Reproduction & Symptom**:
+    - In the morning after local midnight on physical devices, overall phone usage displayed 0 min 0 sec, but individual monitored apps still displayed the previous day's usage (e.g. 15 min), and monitored apps remained blocked due to the previous day's limit.
+  - **Root Causes Identified & Resolved**:
+    1. **`queryAndAggregateUsageStats` Daily Bucket Leak**: In `AndroidUsageStatsRepository.getTodayUsageForPackages`, `queryAndAggregateUsageStats(startTime, endTime)` was queried and combined via `maxOf(aggregatedMs + ongoingMs, eventsMs)`. In Android OS AOSP, `queryAndAggregateUsageStats` delegates to daily interval buckets (`INTERVAL_BEST`) that expand to include yesterday's disk file if today's bucket has not rolled over or is empty. This caused yesterday's full usage (e.g. 15m) to be returned for monitored apps on the new day. In contrast, `getTodayTotalUsageMs()` calculated total phone screen time strictly using `calculateDeviceUsageFromEvents()`.
+       - *Fix*: Made `calculateUsageFromEvents()` the authoritative single calculation for monitored app usage, matching total phone usage behavior. Replaced the loose query aggregation with strict `firstTimeStamp >= startTime` filtering if fallback stats are ever needed.
+    2. **Events Window Truncation for Midnight-Crossing Sessions**: Querying `queryEvents(startTime, endTime)` strictly with `startTime = localMidnight` missed `ACTIVITY_RESUMED` events for applications opened before midnight. If an app was open across midnight, `resumedActivitiesMap` was empty and ongoing duration was lost or miscalculated.
+       - *Fix*: Bounded event querying by querying from `maxOf(0L, startTime - 86_400_000L)` (up to 24h prior) to rebuild accurate session state at midnight, while strictly attributing session time to today via `effectiveStart = maxOf(sessionStart, startTime)` and `effectiveEnd = minOf(eventTime, endTime)`.
+    3. **Stale Blocking Triggers Across Midnight**: `SharedPreferencesEnforcementTriggerRepository` only checked trigger expiration inside its `init` block. When the app process or accessibility service remained alive overnight in the background, `latestTrigger.value` retained yesterday's `EnforcementTrigger`. Neither `onAccessibilityEvent()` nor `LiveLimitEnforcementEngine` expired triggers.
+       - *Fix*: Updated `latestTrigger` getter to run `checkAndExpireStaleTriggers()` upon read. Added calls to `checkAndExpireStaleTriggers()` in `RestrictedAppAccessibilityService` (`onAccessibilityEvent` and `evaluateCurrentForegroundApp`) and in `LiveLimitEnforcementEngine` (`onForegroundPackageChanged` and continuous monitoring loop).
+    4. **Uninvoked Midnight Staged Commitment Lock Transitions**: Staged Commitment Lock changes (limit increases and app removals) were evaluated only on explicit manual requests, leaving them unapplied across midnight until user interaction.
+       - *Fix*: Added `commitmentLockRepository.checkAndApplyMidnightTransitions()` to `LimitsViewModel.loadData()`, `UsageViewModel.refreshUsage()`, and `RestrictedAppAccessibilityService.onAccessibilityEvent()`. Commitment Lock itself is strictly preserved across midnight (only daily usage and daily-limit triggers reset).
+    5. **Timezone & DST Transition Safety**: `SystemTimeProvider` previously stored a fixed `timeZone` instance from its constructor. If the user changed timezones or crossed DST, date boundaries could be miscalculated.
+       - *Fix*: Updated `SystemTimeProvider` to dynamically resolve `timeZoneSupplier: () -> TimeZone = { TimeZone.getDefault() }` on each date boundary calculation.
+  - **Automated Verification**:
+    - Created dedicated test suite `MidnightResetRegressionTest.kt` with 12 comprehensive regression tests.
+    - All 333 tests pass in `testDebugUnitTest` suite (`BUILD SUCCESSFUL`).
+    - Both `assembleDebug` and `assembleRelease` (with full R8 code shrinking and lintVital) build with zero errors.
 - **Stop Doom Scroll — Custom-Duration Limit Enforcement Defect Resolved**: PASS
   - **Reproduction & Symptom**:
     - Preset enforcement (e.g. 15-minute preset blocking Chrome at ~15m 2s) worked reliably on physical devices.

@@ -98,6 +98,8 @@ class LimitsViewModel(
      */
     fun loadData() {
         viewModelScope.launch {
+            commitmentLockRepository?.checkAndApplyMidnightTransitions()
+
             if (usageStatsRepository != null && !usageStatsRepository.hasUsagePermission()) {
                 _uiState.value = LimitsUiState.PermissionRequired
                 return@launch

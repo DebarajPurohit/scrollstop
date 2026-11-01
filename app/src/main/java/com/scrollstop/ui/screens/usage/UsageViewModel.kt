@@ -102,6 +102,8 @@ class UsageViewModel(
      */
     fun refreshUsage() {
         viewModelScope.launch {
+            commitmentLockRepository?.checkAndApplyMidnightTransitions()
+
             if (!usageStatsRepository.hasUsagePermission()) {
                 _uiState.value = UsageUiState.PermissionRequired
                 return@launch

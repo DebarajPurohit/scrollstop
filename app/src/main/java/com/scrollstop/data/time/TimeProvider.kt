@@ -17,13 +17,15 @@ interface TimeProvider {
  * Standard implementation using the device's system clock and local timezone.
  */
 class SystemTimeProvider(
-    private val timeZone: TimeZone = TimeZone.getDefault()
+    private val timeZoneSupplier: () -> TimeZone = { TimeZone.getDefault() }
 ) : TimeProvider {
+
+    constructor(timeZone: TimeZone) : this({ timeZone })
 
     override fun currentTimeMillis(): Long = System.currentTimeMillis()
 
     override fun getStartOfDayMillis(): Long {
-        val calendar = Calendar.getInstance(timeZone).apply {
+        val calendar = Calendar.getInstance(timeZoneSupplier()).apply {
             timeInMillis = currentTimeMillis()
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
@@ -34,7 +36,7 @@ class SystemTimeProvider(
     }
 
     override fun getNextMidnightMillis(): Long {
-        val calendar = Calendar.getInstance(timeZone).apply {
+        val calendar = Calendar.getInstance(timeZoneSupplier()).apply {
             timeInMillis = currentTimeMillis()
             add(Calendar.DAY_OF_YEAR, 1)
             set(Calendar.HOUR_OF_DAY, 0)
