@@ -176,7 +176,7 @@ class MainViewModel(
                         icon = app?.icon,
                         todayUsageMs = todayUsageMap[pkg] ?: 0L,
                         dailyLimitMs = limitMs,
-                        cumulativeUsageMs = cumulativeUsageMap[pkg] ?: (todayUsageMap[pkg] ?: 0L),
+                        cumulativeUsageMs = maxOf(cumulativeUsageMap[pkg] ?: 0L, todayUsageMap[pkg] ?: 0L),
                         observationDays = recordedDays
                     )
                 }.sortedByDescending { it.todayUsageMs }

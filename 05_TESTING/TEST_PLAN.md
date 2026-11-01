@@ -169,6 +169,24 @@
   - Renders calm, distraction-free "Time's up" screen with app label, reached limit, and midnight reset notice.
   - BackHandler intercepts physical back button and navigates safely to Home Dashboard.
 
+### Usage Calculation Audit Test Suite (UsageCalculationAuditTest)
+
+1.  **Regression 01**: Confirmtkt multiple foreground sessions with duplicate pause/stop events accurately calculates exact active time (8m), eliminating 85h inflation bug.
+2.  **Regression 02**: Total device screen time with multiple apps and pause/stop events accurately calculates interactive screen time (15m), eliminating 22h 27m / 23h 59m bug.
+3.  **Invariant 01**: Usage for one package on one calendar day cannot exceed the elapsed time in that day.
+4.  **Invariant 02**: Total phone usage cannot exceed elapsed interactive device screen time.
+5.  **Invariant 03**: Sum of non-overlapping app foreground durations must not exceed total interactive device screen time.
+6.  **Invariant 04**: Every session is counted exactly once; duplicate pause, stop, and destroy events do not duplicate duration.
+7.  **Invariant 05**: No usage is attributed before its actual start; orphan pause and stop events without resume attribute 0 time.
+8.  **Invariant 06**: No usage is attributed after its actual end.
+9.  **Invariant 07**: Today's usage strictly excludes yesterday's completed session duration.
+10. **Invariant 08**: Continuous foreground sessions active across midnight contribute only post-midnight duration to the new day.
+11. **Edge Case 01**: Multiple internal activities within the same application calculate a continuous single session.
+12. **Edge Case 02**: Screen off and on intervals accurately exclude non-interactive screen time.
+13. **Edge Case 03**: Keyguard lock (KEYGUARD_SHOWN) and unlock (KEYGUARD_HIDDEN) pause and resume sessions accurately.
+14. **Edge Case 04**: Switching from Monitored App A to Monitored App B closes App A's session immediately without overlap.
+15. **Edge Case 05**: Seven-day chart daily records return true historical daily usage and never default missing days to 23h 59m.
+
 ### Daily Midnight Reset Regression Test Suite (MidnightResetRegressionTest)
 
 1.  **Regression 01**: Monitored app usage from previous day (prior to local midnight) is strictly excluded after midnight reset.

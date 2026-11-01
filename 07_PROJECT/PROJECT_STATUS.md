@@ -1,13 +1,42 @@
 # Project Status
 
 **Date:** 2026-11-01\
-**Stage:** Daily Midnight Reset Regression Resolved (333 AUTOMATED TESTS PASS)
+**Stage:** Critical Usage Calculation Audit Resolved (348 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Critical Usage Calculation Audit Resolved**: PASS
+  - **Reproduction & Symptom**:
+    - Physical device screenshot dated 1 Nov 2026, ~10:28 PM showed:
+      - Today's total phone usage: 22h 27m
+      - Seven-day chart: Mon through Sat displayed ~23h 59m
+      - Today's average: 23h 46m
+      - Monitored app Confirmtkt: 85h 0m today
+      - Confirmtkt seven-day figure: 5m
+  - **Root Causes Identified & Resolved**:
+    1. **Catastrophic Orphan Pause/Stop Fallback in `calculateUsageFromEvents` & `calculateDeviceUsageFromEvents`**:
+       - An erroneous fallback block was added in the `else` branch of `ACTIVITY_PAUSED` and `ACTIVITY_STOPPED`:
+         `val effectiveStart = startTime; val effectiveEnd = minOf(eventTime, endTime); accumulatedTime += (effectiveEnd - effectiveStart)`
+       - In Android OS, whenever an activity loses foreground, the system emits `ACTIVITY_PAUSED` followed immediately by `ACTIVITY_STOPPED`. In multi-activity transitions or app switching, `resumedActivitiesMap` was cleared by the pause or preempting resume, causing subsequent `ACTIVITY_STOPPED` events to hit the `else` branch.
+       - Each time an app stopped, this fallback added the entire duration from midnight (`00:00:00`) to the current event timestamp (e.g. 21h+ at 9:00 PM).
+       - For Confirmtkt, exiting 4 times during the day accumulated 4 x ~21.25 hours = **85 hours**!
+       - For device usage, every app stopped throughout the day accumulated hundreds of phantom hours, capped by `minOf(accumulatedTimeMs, maxPossible)` to 23h 59m for past days and 22h 27m for today (10:28 PM elapsed time).
+       - The 7-day average of six 23h 59m days and one 22h 27m day naturally computed to **23h 46m**.
+       - Confirmtkt's 7-day figure was 5m because `getMultiDayUsageForPackages` queried `queryAndAggregateUsageStats`, which reported the true OS baseline of 5 minutes.
+    2. **Correction Implemented**:
+       - Completely removed the ungrounded orphan pause/stop fallback. Orphan or duplicate pause/stop/destroy events without an active session are strictly no-ops.
+       - Unhandled `KEYGUARD_SHOWN` (17) and `KEYGUARD_HIDDEN` (18) events now explicitly pause and resume sessions.
+       - App-to-app switching: When any package resumes, any other monitored package session is immediately closed at `eventTime` to eliminate multi-monitored overlap.
+       - Defensive mathematical clamping added: per-package usage is strictly bounded by elapsed time `maxOf(0L, endTime - startTime)`.
+       - Added privacy-safe diagnostic logging to track session bounds and durations without collecting user or accessibility text.
+       - Synchronized `cumulativeUsageMs` in `MainViewModel` to ensure `maxOf(cumulativeUsageMap[pkg], todayUsageMap[pkg])`.
+  - **Automated Verification**:
+    - Created dedicated test suite `UsageCalculationAuditTest.kt` with 12 deterministic tests verifying all 8 mathematical invariants and edge cases.
+    - Full `testDebugUnitTest` passes: **348 tests passed, 0 failures**.
+    - Both `assembleDebug` and `assembleRelease` (with full R8 code shrinking and lintVital) build with zero errors.
 - **Stop Doom Scroll — Critical Daily Midnight Reset Regression Resolved**: PASS
   - **Reproduction & Symptom**:
     - In the morning after local midnight on physical devices, overall phone usage displayed 0 min 0 sec, but individual monitored apps still displayed the previous day's usage (e.g. 15 min), and monitored apps remained blocked due to the previous day's limit.

@@ -887,10 +887,18 @@ class AndroidUsageStatsRepositoryTest {
         )
 
         val pkg = "com.google.android.youtube"
-        // User opened YouTube before midnight and closes it 15 minutes after midnight
+        // User opened YouTube 10 minutes before midnight and closes it 15 minutes after midnight
+        val tPre = fakeTimeProvider.startOfDay - 600_000L // 10m before midnight
         val t0 = fakeTimeProvider.startOfDay + 900_000L // 15m after midnight
 
-        // Only ACTIVITY_PAUSED appears in today's query window (opened before midnight)
+        shadowUsageStats.addEvent(
+            ShadowUsageStatsManager.EventBuilder.buildEvent()
+                .setPackage(pkg)
+                .setClass("WatchActivity")
+                .setEventType(UsageEvents.Event.ACTIVITY_RESUMED)
+                .setTimeStamp(tPre)
+                .build()
+        )
         shadowUsageStats.addEvent(
             ShadowUsageStatsManager.EventBuilder.buildEvent()
                 .setPackage(pkg)

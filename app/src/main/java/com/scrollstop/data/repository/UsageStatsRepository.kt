@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Process
+import android.util.Log
 import com.scrollstop.data.time.SystemTimeProvider
 import com.scrollstop.data.time.TimeProvider
 import com.scrollstop.domain.model.DailyUsageRecord
@@ -95,15 +96,26 @@ class AndroidUsageStatsRepository(
                     val className = event.className ?: "default_activity"
 
                     when (eventType) {
+                        UsageEvents.Event.SCREEN_NON_INTERACTIVE,
+                        17 /* KEYGUARD_SHOWN */ -> {
+                            resumedActivitiesMap.clear()
+                            lastResumedPkg = null
+                        }
                         UsageEvents.Event.ACTIVITY_RESUMED -> {
                             resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }.add(className)
                             lastResumedPkg = pkg
                         }
                         UsageEvents.Event.ACTIVITY_PAUSED,
-                        UsageEvents.Event.ACTIVITY_STOPPED -> {
+                        UsageEvents.Event.ACTIVITY_STOPPED,
+                        24 /* ACTIVITY_DESTROYED */ -> {
                             val activeSet = resumedActivitiesMap[pkg]
                             if (activeSet != null) {
-                                activeSet.remove(className)
+                                if (event.className != null) {
+                                    activeSet.remove(event.className)
+                                } else {
+                                    val first = activeSet.firstOrNull()
+                                    if (first != null) activeSet.remove(first)
+                                }
                                 if (activeSet.isEmpty()) {
                                     resumedActivitiesMap.remove(pkg)
                                 }
@@ -221,8 +233,11 @@ class AndroidUsageStatsRepository(
                 val eventType = event.eventType
                 val eventTime = event.timeStamp.coerceIn(queryStart, endTime)
 
-                // Handle screen non-interactive (screen off): close active sessions at event timestamp
-                if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+                // Handle screen non-interactive (screen off) / keyguard shown (device locked):
+                // Close active sessions at event timestamp; preserve resumed activities for resume upon unlock
+                if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE ||
+                    eventType == 17 /* KEYGUARD_SHOWN */
+                ) {
                     screenIsInteractive = false
                     for (pkg in packageNames) {
                         val start = currentSessionStartMap.remove(pkg)
@@ -230,14 +245,17 @@ class AndroidUsageStatsRepository(
                             val effectiveStart = maxOf(start, startTime)
                             val effectiveEnd = minOf(eventTime, endTime)
                             if (effectiveEnd > effectiveStart) {
-                                accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + (effectiveEnd - effectiveStart)
+                                val sessionDuration = effectiveEnd - effectiveStart
+                                accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + sessionDuration
+                                Log.d("UsageStatsRepository", "Diagnostic: App $pkg screen-off pause session: start=$effectiveStart, end=$effectiveEnd, duration=$sessionDuration")
                             }
                         }
                     }
                     continue
                 }
 
-                // Handle screen interactive (screen turned on/unlocked): resume sessions for active foreground apps
+                // Handle screen interactive (screen on) / keyguard hidden (device unlocked):
+                // Resume sessions for active foreground apps
                 if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE ||
                     eventType == 18 /* KEYGUARD_HIDDEN */
                 ) {
@@ -246,6 +264,7 @@ class AndroidUsageStatsRepository(
                         val activeSet = resumedActivitiesMap[pkg]
                         if (activeSet != null && activeSet.isNotEmpty() && !currentSessionStartMap.containsKey(pkg)) {
                             currentSessionStartMap[pkg] = eventTime
+                            Log.d("UsageStatsRepository", "Diagnostic: App $pkg screen-on resume session: start=$eventTime")
                         }
                     }
                     continue
@@ -253,38 +272,44 @@ class AndroidUsageStatsRepository(
 
                 val pkg = event.packageName ?: continue
 
-                // If another user-facing application resumes, monitored apps cannot remain in foreground
-                if (eventType == UsageEvents.Event.ACTIVITY_RESUMED && pkg !in packageNames) {
+                // When ANY application resumes:
+                // Close any OTHER monitored app's session since another app has taken the foreground
+                if (eventType == UsageEvents.Event.ACTIVITY_RESUMED) {
+                    screenIsInteractive = true
                     for (monitoredPkg in packageNames) {
-                        resumedActivitiesMap.remove(monitoredPkg)
-                        val start = currentSessionStartMap.remove(monitoredPkg)
-                        if (start != null) {
-                            val effectiveStart = maxOf(start, startTime)
-                            val effectiveEnd = minOf(eventTime, endTime)
-                            if (effectiveEnd > effectiveStart) {
-                                accumulatedTimeMap[monitoredPkg] = (accumulatedTimeMap[monitoredPkg] ?: 0L) + (effectiveEnd - effectiveStart)
+                        if (monitoredPkg != pkg) {
+                            resumedActivitiesMap.remove(monitoredPkg)
+                            val start = currentSessionStartMap.remove(monitoredPkg)
+                            if (start != null) {
+                                val effectiveStart = maxOf(start, startTime)
+                                val effectiveEnd = minOf(eventTime, endTime)
+                                if (effectiveEnd > effectiveStart) {
+                                    val sessionDuration = effectiveEnd - effectiveStart
+                                    accumulatedTimeMap[monitoredPkg] = (accumulatedTimeMap[monitoredPkg] ?: 0L) + sessionDuration
+                                    Log.d("UsageStatsRepository", "Diagnostic: App $monitoredPkg preempted by $pkg: start=$effectiveStart, end=$effectiveEnd, duration=$sessionDuration")
+                                }
                             }
                         }
+                    }
+
+                    if (pkg in packageNames) {
+                        val activeSet = resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }
+                        if (activeSet.isEmpty()) {
+                            currentSessionStartMap[pkg] = eventTime
+                            Log.d("UsageStatsRepository", "Diagnostic: App $pkg session start: start=$eventTime")
+                        }
+                        val className = event.className ?: "activity_${event.timeStamp}"
+                        activeSet.add(className)
                     }
                     continue
                 }
 
                 if (pkg !in packageNames) continue
 
-                val className = event.className ?: "activity_${event.timeStamp}"
-
                 when (eventType) {
-                    UsageEvents.Event.ACTIVITY_RESUMED -> {
-                        screenIsInteractive = true
-                        val activeSet = resumedActivitiesMap.getOrPut(pkg) { mutableSetOf() }
-                        if (activeSet.isEmpty()) {
-                            currentSessionStartMap[pkg] = eventTime
-                        }
-                        activeSet.add(className)
-                    }
-
                     UsageEvents.Event.ACTIVITY_PAUSED,
-                    UsageEvents.Event.ACTIVITY_STOPPED -> {
+                    UsageEvents.Event.ACTIVITY_STOPPED,
+                    24 /* ACTIVITY_DESTROYED */ -> {
                         val activeSet = resumedActivitiesMap[pkg]
                         if (activeSet != null && activeSet.isNotEmpty()) {
                             if (event.className != null) {
@@ -302,17 +327,12 @@ class AndroidUsageStatsRepository(
                                     if (effectiveEnd > effectiveStart) {
                                         val sessionDuration = effectiveEnd - effectiveStart
                                         accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + sessionDuration
+                                        Log.d("UsageStatsRepository", "Diagnostic: App $pkg session closed: start=$effectiveStart, end=$effectiveEnd, duration=$sessionDuration")
                                     }
                                 }
                             }
-                        } else {
-                            // Session began before query window or orphan pause event:
-                            val effectiveStart = startTime
-                            val effectiveEnd = minOf(eventTime, endTime)
-                            if (effectiveEnd > effectiveStart) {
-                                accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + (effectiveEnd - effectiveStart)
-                            }
                         }
+                        // Orphan or duplicate pause/stop/destroy event: do nothing. Never attribute time from day start.
                     }
                 }
             }
@@ -329,14 +349,20 @@ class AndroidUsageStatsRepository(
                                 val ongoingDuration = endTime - effectiveStart
                                 ongoingDurationMap[pkg] = ongoingDuration
                                 accumulatedTimeMap[pkg] = (accumulatedTimeMap[pkg] ?: 0L) + ongoingDuration
+                                Log.d("UsageStatsRepository", "Diagnostic: App $pkg ongoing session: start=$effectiveStart, end=$endTime, duration=$ongoingDuration")
                             }
                         }
                     }
                 }
             }
 
+            val maxPossibleMs = maxOf(0L, endTime - startTime)
+            val clampedMap = packageNames.associateWith { pkg ->
+                minOf(accumulatedTimeMap[pkg] ?: 0L, maxPossibleMs)
+            }
+
             EventsCalculationResult(
-                eventsUsageMap = accumulatedTimeMap,
+                eventsUsageMap = clampedMap,
                 ongoingDurationMap = ongoingDurationMap,
                 hasEvents = sawAnyEvent
             )
@@ -448,25 +474,34 @@ class AndroidUsageStatsRepository(
             val eventTime = event.timeStamp.coerceIn(queryStart, endTime)
             val pkg = event.packageName
 
-            // Handle screen non-interactive (screen off): close any active session at event timestamp
-            if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE) {
+            // Handle screen non-interactive (screen off) / keyguard shown (device locked):
+            // Close active session at event timestamp
+            if (eventType == UsageEvents.Event.SCREEN_NON_INTERACTIVE ||
+                eventType == 17 /* KEYGUARD_SHOWN */
+            ) {
                 screenIsInteractive = false
                 if (activeSessionStart != null) {
                     val effectiveStart = maxOf(activeSessionStart, startTime)
                     val effectiveEnd = minOf(eventTime, endTime)
                     if (effectiveEnd > effectiveStart) {
-                        accumulatedTimeMs += (effectiveEnd - effectiveStart)
+                        val duration = effectiveEnd - effectiveStart
+                        accumulatedTimeMs += duration
+                        Log.d("UsageStatsRepository", "Diagnostic: Device screen-off session: start=$effectiveStart, end=$effectiveEnd, duration=$duration")
                     }
                     activeSessionStart = null
                 }
                 continue
             }
 
-            // Handle screen interactive (screen turned on/unlocked): resume active session if app still active
-            if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE || eventType == 18 /* KEYGUARD_HIDDEN */) {
+            // Handle screen interactive (screen on) / keyguard hidden (device unlocked):
+            // Resume active session if an app is still in foreground
+            if (eventType == UsageEvents.Event.SCREEN_INTERACTIVE ||
+                eventType == 18 /* KEYGUARD_HIDDEN */
+            ) {
                 screenIsInteractive = true
                 if (activeResumedPackages.isNotEmpty() && activeSessionStart == null) {
                     activeSessionStart = eventTime
+                    Log.d("UsageStatsRepository", "Diagnostic: Device screen-on resume session: start=$eventTime")
                 }
                 continue
             }
@@ -484,11 +519,13 @@ class AndroidUsageStatsRepository(
 
                     if (activeSessionStart == null) {
                         activeSessionStart = eventTime
+                        Log.d("UsageStatsRepository", "Diagnostic: Device session start ($pkg): start=$eventTime")
                     }
                 }
 
                 UsageEvents.Event.ACTIVITY_PAUSED,
-                UsageEvents.Event.ACTIVITY_STOPPED -> {
+                UsageEvents.Event.ACTIVITY_STOPPED,
+                24 /* ACTIVITY_DESTROYED */ -> {
                     val activeSet = resumedActivitiesMap[pkg]
                     if (activeSet != null && activeSet.isNotEmpty()) {
                         activeSet.remove(className)
@@ -504,17 +541,13 @@ class AndroidUsageStatsRepository(
                         val effectiveStart = maxOf(activeSessionStart, startTime)
                         val effectiveEnd = minOf(eventTime, endTime)
                         if (effectiveEnd > effectiveStart) {
-                            accumulatedTimeMs += (effectiveEnd - effectiveStart)
+                            val duration = effectiveEnd - effectiveStart
+                            accumulatedTimeMs += duration
+                            Log.d("UsageStatsRepository", "Diagnostic: Device session closed: start=$effectiveStart, end=$effectiveEnd, duration=$duration")
                         }
                         activeSessionStart = null
-                    } else if (activeSessionStart == null) {
-                        // Session began before query window or orphan pause event:
-                        val effectiveStart = startTime
-                        val effectiveEnd = minOf(eventTime, endTime)
-                        if (effectiveEnd > effectiveStart) {
-                            accumulatedTimeMs += (effectiveEnd - effectiveStart)
-                        }
                     }
+                    // If activeSessionStart == null or activeResumedPackages is not empty, do not add orphan time
                 }
             }
         }
@@ -523,7 +556,9 @@ class AndroidUsageStatsRepository(
         if (screenIsInteractive && activeResumedPackages.isNotEmpty() && activeSessionStart != null) {
             val effectiveStart = maxOf(activeSessionStart, startTime)
             if (endTime > effectiveStart) {
-                accumulatedTimeMs += (endTime - effectiveStart)
+                val duration = endTime - effectiveStart
+                accumulatedTimeMs += duration
+                Log.d("UsageStatsRepository", "Diagnostic: Device ongoing session: start=$effectiveStart, end=$endTime, duration=$duration")
             }
         }
 
