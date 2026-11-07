@@ -194,6 +194,9 @@ object ServiceLocator {
     private var themeRepository: com.scrollstop.data.repository.ThemeRepository? = null
 
     @Volatile
+    private var onboardingRepository: com.scrollstop.data.repository.OnboardingRepository? = null
+
+    @Volatile
     private var appDiscoveryRepository: com.scrollstop.data.repository.AppDiscoveryRepository? = null
 
     fun getAppDiscoveryRepository(context: Context): com.scrollstop.data.repository.AppDiscoveryRepository {
@@ -216,6 +219,16 @@ object ServiceLocator {
         }
     }
 
+    fun getOnboardingRepository(context: Context): com.scrollstop.data.repository.OnboardingRepository {
+        return onboardingRepository ?: synchronized(this) {
+            onboardingRepository ?: com.scrollstop.data.repository.SharedPreferencesOnboardingRepository(
+                context.applicationContext
+            ).also {
+                onboardingRepository = it
+            }
+        }
+    }
+
     fun resetForTesting(
         selectedAppsRepo: SelectedAppsRepository? = null,
         dailyLimitRepo: DailyLimitRepository? = null,
@@ -228,7 +241,8 @@ object ServiceLocator {
         commitmentLockRepo: com.scrollstop.data.repository.CommitmentLockRepository? = null,
         commitmentRules: com.scrollstop.domain.rules.CommitmentRuleEngine? = null,
         themeRepo: com.scrollstop.data.repository.ThemeRepository? = null,
-        appDiscoveryRepo: com.scrollstop.data.repository.AppDiscoveryRepository? = null
+        appDiscoveryRepo: com.scrollstop.data.repository.AppDiscoveryRepository? = null,
+        onboardingRepo: com.scrollstop.data.repository.OnboardingRepository? = null
     ) {
         selectedAppsRepository = selectedAppsRepo
         dailyLimitRepository = dailyLimitRepo
@@ -242,5 +256,6 @@ object ServiceLocator {
         commitmentRuleEngine = commitmentRules
         themeRepository = themeRepo
         appDiscoveryRepository = appDiscoveryRepo
+        onboardingRepository = onboardingRepo
     }
 }

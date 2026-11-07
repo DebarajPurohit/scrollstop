@@ -187,6 +187,24 @@
 14. **Edge Case 04**: Switching from Monitored App A to Monitored App B closes App A's session immediately without overlap.
 15. **Edge Case 05**: Seven-day chart daily records return true historical daily usage and never default missing days to 23h 59m.
 
+### Phase 1 Welcome & Mandatory Usage Access Gate Test Suite (WelcomeAndUsageGateTest)
+
+1.  **Welcome UI (Light Theme)**: App identity ("STOP DOOM SCROLL"), motivational copy, privacy badge ("100% Local-First • Zero Cloud Sync"), and both CTA buttons render correctly with accessible touch targets ($\ge 48\text{dp}$).
+2.  **Welcome UI (Dark Theme)**: Elements render properly in Dark theme mode with adequate WCAG AA contrast.
+3.  **Guest Entry**: Tapping "Continue as Guest" completes onboarding and invokes callback.
+4.  **Google Entry**: Tapping "Continue with Google" records Google session intent and invokes callback.
+5.  **Usage Gate Education**: Renders 4 educational cards ("Why It's Needed", "Powers Your Dashboard", "100% Local-First Privacy", "Separate from Accessibility"), headline, and action buttons when permission is ungranted.
+6.  **Usage Gate Grant Action**: Tapping "Grant Usage Access" opens Android system usage access settings intent.
+7.  **Usage Gate Recheck Action**: Tapping "Recheck Permission" re-evaluates `AppOpsManager` permission status.
+8.  **Usage Gate Guidance Banner**: Displays actionable guidance banner when permission recheck fails ("Permission not detected yet. In Android Settings...").
+9.  **Onboarding Repository Default**: Defaults to `hasCompletedWelcome = false` and `sessionType = guest` for new installs.
+10. **Onboarding Repository Persistence**: Persists welcome completion state and session type (`google` or `guest`) across app restarts.
+11. **Navigation Initial Launch**: First-time launch without onboarding completed unconditionally routes to `Screen.Welcome`.
+12. **Navigation Welcome Completed Without Permission**: User who finished Welcome but lacks Usage Access routes directly to `Screen.UsageAccessGate`.
+13. **Navigation Returning User With Permission**: User who finished Welcome and granted Usage Access bypasses gates directly to `Screen.Main` (Home dashboard).
+14. **Navigation Guest Transition**: Tapping "Continue as Guest" immediately transitions to `Screen.UsageAccessGate` if permission is missing.
+15. **Navigation Google Transition**: Tapping "Continue with Google" immediately transitions to `Screen.UsageAccessGate` if permission is missing.
+
 ### Daily Midnight Reset Regression Test Suite (MidnightResetRegressionTest)
 
 1.  **Regression 01**: Monitored app usage from previous day (prior to local midnight) is strictly excluded after midnight reset.

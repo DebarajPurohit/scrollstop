@@ -35,5 +35,4 @@ document in the same change.
 
 ## Definition of Done
 
-Code implemented + build passes + relevant tests pass + critical edge
-cases reviewed + security/privacy checked + documentation updated.
+Code implemented + build passes (assembleDebug & assembleRelease) + relevant tests pass (unit, Compose, and regression suites) + onboarding and permission gating verified + critical edge cases reviewed + security/privacy checked + documentation updated.

@@ -1,13 +1,40 @@
 # Project Status
 
-**Date:** 2026-11-01\
-**Stage:** Critical Usage Calculation Audit Resolved (348 AUTOMATED TESTS PASS)
+**Date:** 2026-11-07\
+**Stage:** Phase 1: Welcome Screen & Mandatory Usage Access Gate Implemented (363 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 1: Welcome Screen & Mandatory Usage Access Gate Implemented**: PASS
+  - **Implementation Delivered**:
+    1. **Welcome Screen (`WelcomeScreen.kt`)**:
+       - Designed and built with the approved Bold Modern visual direction, Balanced layout density, Motivational personality, Slate/Emerald color tokens, and full Light & Dark mode support.
+       - App branding badge (`STOP DOOM SCROLL`), headline ("Reclaim your focus. Break the scroll loop."), concise motivational description, local-first privacy badge ("100% Local-First • Zero Cloud Sync"), and disclaimer ("Stop Doom Scroll works completely offline. Sign-in is optional.").
+       - Two entry options: Primary "Continue with Google" and secondary "Continue as Guest", with touch targets $\ge 48\text{dp}$.
+       - Implemented clean local onboarding persistence via `OnboardingRepository` (`SharedPreferencesOnboardingRepository`), preserving local-first offline architecture without premature auth dependencies.
+    2. **Mandatory Usage Access Gate Screen (`UsageAccessGateScreen.kt`)**:
+       - Dedicated permission gate with prominent shield header ("USAGE ACCESS REQUIRED") and 4 educational cards explaining:
+         * *Why It's Needed*: Exact duration measurement for active apps.
+         * *Powers Your Dashboard*: Powers daily limits, remaining time calculations, and 7-day usage trends.
+         * *100% Local-First Privacy*: On-device processing with zero cloud sync.
+         * *Separate from Accessibility*: Usage Access is for time tracking; Accessibility is for blocking enforcement.
+       - Action controls: Primary "Grant Usage Access" (launches Android system `ACTION_USAGE_ACCESS_SETTINGS`) and secondary "Recheck Permission" (evaluates runtime status).
+       - Contextual guidance banner displayed if permission check fails after an attempt.
+       - Lifecycle observer (`LifecycleEventObserver`) automatically verifying permission on `ON_RESUME` when returning from Android system settings.
+       - Strict gate enforcement: No skip, dismiss, or bypass actions.
+    3. **Navigation Integration (`AppNavigation.kt`)**:
+       - `Screen.Welcome` and `Screen.UsageAccessGate` added to the navigation hierarchy.
+       - Entry routing evaluates `onboardingRepository.hasCompletedWelcome()` and `usageStatsRepository.hasUsagePermission()`.
+       - Users cannot reach `Screen.Main` (Home dashboard) without verified Usage Access.
+       - Dynamic `ON_RESUME` re-verification: If a user revokes Usage Access in Android Settings while the app is in the background, returning to the app immediately routes back to `Screen.UsageAccessGate`.
+    4. **Automated Verification**:
+       - Created comprehensive test suite `WelcomeAndUsageGateTest.kt` covering 15 test cases (Light/Dark themes, Guest and Google flows, education cards, grant and recheck callbacks, guidance banner, repository defaults and persistence, and end-to-end navigation flows).
+       - Updated existing `AppNavigationTest.kt` preconditions to reflect authenticated and permission-granted states.
+       - Full unit test suite passes: **363 tests passed, 0 failures**.
+       - Both `assembleDebug` and `assembleRelease` (with R8 and lintVital) build successfully with zero errors.
 - **Stop Doom Scroll — Critical Usage Calculation Audit Resolved**: PASS
   - **Reproduction & Symptom**:
     - Physical device screenshot dated 1 Nov 2026, ~10:28 PM showed:

@@ -1,6 +1,8 @@
 package com.scrollstop.navigation
 
+import android.app.AppOpsManager
 import android.content.pm.ApplicationInfo
+import android.os.Process
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -19,6 +21,8 @@ import com.scrollstop.data.repository.AppDiscoveryRepository
 import com.scrollstop.data.repository.InMemoryDailyLimitRepository
 import com.scrollstop.data.repository.InMemoryEnforcementTriggerRepository
 import com.scrollstop.data.repository.InMemorySelectedAppsRepository
+import com.scrollstop.data.repository.OnboardingRepository
+import com.scrollstop.data.repository.SharedPreferencesOnboardingRepository
 import com.scrollstop.domain.model.DiscoveredApp
 import com.scrollstop.ui.theme.StopDoomScrollTheme
 import org.junit.After
@@ -28,6 +32,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
@@ -68,11 +73,23 @@ class AppNavigationTest {
 
     @Before
     fun setUp() {
+        val appOpsManager = context.getSystemService(android.content.Context.APP_OPS_SERVICE) as AppOpsManager
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+        val onboardingRepository = SharedPreferencesOnboardingRepository(context).apply {
+            setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+        }
+
         ServiceLocator.resetForTesting(
             selectedAppsRepo = selectedAppsRepository,
             dailyLimitRepo = dailyLimitRepository,
             triggerRepo = enforcementTriggerRepository,
-            appDiscoveryRepo = FakeAppDiscoveryRepository(sampleDiscoveredApps)
+            appDiscoveryRepo = FakeAppDiscoveryRepository(sampleDiscoveredApps),
+            onboardingRepo = onboardingRepository
         )
     }
 

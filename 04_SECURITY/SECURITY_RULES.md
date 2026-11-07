@@ -42,6 +42,17 @@ Protect stored data using Android platform security mechanisms (`SharedPreferenc
 
 Explain data access and permission purpose in a prominent in-app disclosure before requesting sensitive capabilities. Require explicit affirmative consent.
 
+## Local-First Onboarding & Optional Session Policy
+
+- **Session Choice**: Users may choose "Continue with Google" or "Continue as Guest".
+- **Zero Mandatory Authentication**: Account creation is never required to use any core functionality.
+- **Strict Local-First Boundary**: Both Guest and Google session identifiers are stored strictly in local device storage (`SharedPreferencesOnboardingRepository`). No remote telemetry, analytics, cloud profile, or server accounts are created.
+- **Usage Access Gate Isolation**:
+  - Usage Access (`PACKAGE_USAGE_STATS`) is requested strictly for local elapsed time and session duration calculations on the client.
+  - Usage data is never transmitted across network or exported to third parties.
+  - The app declares 0 network permissions (`android.permission.INTERNET` is absent).
+  - Users cannot bypass the Usage Access gate to access the dashboard or app limits. Revocation of Usage Access while backgrounded immediately diverts the app back to the gate screen upon resume.
+
 ## Enforcement
 
 Blocking decisions must be based on explicit local rules evaluated by `UsageRuleEngine`, not hidden heuristics, AI, or background timers.

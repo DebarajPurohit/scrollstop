@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.scrollstop.data.di.ServiceLocator
+import com.scrollstop.data.repository.OnboardingRepository
 import com.scrollstop.data.repository.PackageManagerAppDiscoveryRepository
 import com.scrollstop.ui.components.BottomNavDestination
 import com.scrollstop.ui.components.ScrollStopBottomNav
@@ -28,13 +29,17 @@ import com.scrollstop.ui.screens.blocking.BlockingScreen
 import com.scrollstop.ui.screens.blocking.BlockingViewModel
 import com.scrollstop.ui.screens.limits.LimitsScreen
 import com.scrollstop.ui.screens.limits.LimitsViewModel
+import com.scrollstop.ui.screens.permission.UsageAccessGateScreen
 import com.scrollstop.ui.screens.usage.UsageScreen
 import com.scrollstop.ui.screens.usage.UsageViewModel
+import com.scrollstop.ui.screens.welcome.WelcomeScreen
 
 /**
  * Screen destinations for the Stop Doom Scroll application.
  */
 sealed interface Screen {
+    data object Welcome : Screen
+    data object UsageAccessGate : Screen
     data object Main : Screen
     data object Limits : Screen
     data object AppSelection : Screen
@@ -51,12 +56,12 @@ fun AppNavigation(
     initialBlockedPackage: String? = null,
     onClearBlockedPackage: () -> Unit = {}
 ) {
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Main) }
-    var previousScreen by remember { mutableStateOf<Screen>(Screen.Main) }
-    var showThemeDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    val onboardingRepository = remember(context) {
+        ServiceLocator.getOnboardingRepository(context)
+    }
     val selectedAppsRepository = remember(context) {
         ServiceLocator.getSelectedAppsRepository(context)
     }
@@ -84,6 +89,18 @@ fun AppNavigation(
     val themeRepository = remember(context) {
         ServiceLocator.getThemeRepository(context)
     }
+
+    val initialScreen = remember {
+        when {
+            !initialBlockedPackage.isNullOrBlank() -> Screen.Blocking(initialBlockedPackage)
+            !onboardingRepository.hasCompletedWelcome() -> Screen.Welcome
+            !usageStatsRepository.hasUsagePermission() -> Screen.UsageAccessGate
+            else -> Screen.Main
+        }
+    }
+    var currentScreen by remember { mutableStateOf<Screen>(initialScreen) }
+    var previousScreen by remember { mutableStateOf<Screen>(initialScreen) }
+    var showThemeDialog by remember { mutableStateOf(false) }
 
     val mainViewModel = remember(
         protectionHealthRepository,
@@ -121,14 +138,26 @@ fun AppNavigation(
         )
     }
 
-    // Refresh protection health, check midnight transitions, and clean up expired midnight triggers when resuming to foreground
+    // Refresh protection health, check midnight transitions, and monitor usage access revocation
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 enforcementTriggerRepository.checkAndExpireStaleTriggers()
                 commitmentLockRepository.checkAndApplyMidnightTransitions()
-                mainViewModel.refreshDashboard(context)
-                limitsViewModel.refresh()
+
+                val hasPermission = usageStatsRepository.hasUsagePermission()
+                if (currentScreen is Screen.UsageAccessGate && hasPermission) {
+                    currentScreen = Screen.Main
+                } else if (onboardingRepository.hasCompletedWelcome() && !hasPermission && currentScreen !is Screen.Blocking) {
+                    // Usage Access was revoked while app was backgrounded: route directly to mandatory gate
+                    currentScreen = Screen.UsageAccessGate
+                }
+
+                if (currentScreen is Screen.Main) {
+                    mainViewModel.refreshDashboard(context)
+                } else if (currentScreen is Screen.Limits) {
+                    limitsViewModel.refresh()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -161,6 +190,48 @@ fun AppNavigation(
     }
 
     when (val screen = currentScreen) {
+        is Screen.Welcome -> {
+            WelcomeScreen(
+                onContinueWithGoogle = {
+                    onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GOOGLE)
+                    currentScreen = if (usageStatsRepository.hasUsagePermission()) {
+                        Screen.Main
+                    } else {
+                        Screen.UsageAccessGate
+                    }
+                },
+                onContinueAsGuest = {
+                    onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+                    currentScreen = if (usageStatsRepository.hasUsagePermission()) {
+                        Screen.Main
+                    } else {
+                        Screen.UsageAccessGate
+                    }
+                }
+            )
+        }
+        is Screen.UsageAccessGate -> {
+            val hasPermission = usageStatsRepository.hasUsagePermission()
+            BackHandler {
+                if (!onboardingRepository.hasCompletedWelcome()) {
+                    currentScreen = Screen.Welcome
+                }
+            }
+            UsageAccessGateScreen(
+                hasPermission = hasPermission,
+                onOpenSettings = {
+                    mainViewModel.openUsageAccessSettings(context)
+                },
+                onRecheckPermission = {
+                    if (usageStatsRepository.hasUsagePermission()) {
+                        currentScreen = Screen.Main
+                    }
+                },
+                onPermissionGranted = {
+                    currentScreen = Screen.Main
+                }
+            )
+        }
         is Screen.Main -> {
             val mainUiState by mainViewModel.uiState.collectAsState()
 
@@ -189,7 +260,7 @@ fun AppNavigation(
                     showThemeDialog = true
                 },
                 onGrantUsageAccess = {
-                    mainViewModel.openUsageAccessSettings(context)
+                    currentScreen = Screen.UsageAccessGate
                 },
                 onEnableAccessibility = {
                     mainViewModel.openAccessibilitySettings(context)
@@ -219,7 +290,7 @@ fun AppNavigation(
                     currentScreen = Screen.Main
                 },
                 onRequestUsagePermission = {
-                    mainViewModel.openUsageAccessSettings(context)
+                    currentScreen = Screen.UsageAccessGate
                 },
                 bottomBar = {
                     ScrollStopBottomNav(
