@@ -4,12 +4,14 @@ import android.app.AppOpsManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Process
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import com.scrollstop.data.di.ServiceLocator
 import com.scrollstop.data.repository.OnboardingRepository
@@ -34,7 +36,7 @@ import org.robolectric.annotation.Config
 class WelcomeAndUsageGateTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     private lateinit var context: Context
     private lateinit var appOpsManager: AppOpsManager
@@ -130,10 +132,8 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 UsageAccessGateScreen(
-                    hasPermission = false,
                     onOpenSettings = {},
-                    onRecheckPermission = {},
-                    onPermissionGranted = {}
+                    onRecheckPermission = { false }
                 )
             }
         }
@@ -155,10 +155,8 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 UsageAccessGateScreen(
-                    hasPermission = false,
                     onOpenSettings = { settingsOpened = true },
-                    onRecheckPermission = {},
-                    onPermissionGranted = {}
+                    onRecheckPermission = { false }
                 )
             }
         }
@@ -174,10 +172,11 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 UsageAccessGateScreen(
-                    hasPermission = false,
                     onOpenSettings = {},
-                    onRecheckPermission = { rechecked = true },
-                    onPermissionGranted = {}
+                    onRecheckPermission = {
+                        rechecked = true
+                        false
+                    }
                 )
             }
         }
@@ -191,10 +190,8 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 UsageAccessGateScreen(
-                    hasPermission = false,
                     onOpenSettings = {},
-                    onRecheckPermission = {},
-                    onPermissionGranted = {}
+                    onRecheckPermission = { false }
                 )
             }
         }
@@ -335,6 +332,194 @@ class WelcomeAndUsageGateTest {
         composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
         assertTrue(onboardingRepository.hasCompletedWelcome())
         assertEquals(OnboardingRepository.SESSION_TYPE_STANDARD, onboardingRepository.getSessionType())
+    }
+
+    // --- REGRESSION TESTS: DEFECT A (BACK NAVIGATION) & DEFECT B (PERMISSION LIFECYCLE) ---
+
+    @Test
+    fun backPress_fromUsageGate_duringFirstTimeOnboarding_returnsToWelcome() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.resetForTesting()
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        // Click Get Started on Welcome
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+        assertTrue(onboardingRepository.hasCompletedWelcome())
+
+        // Press back from Usage Gate
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+
+        // Must return to Welcome and reset welcome completion
+        composeTestRule.onNodeWithText("STOP DOOM SCROLL").assertIsDisplayed()
+        assertFalse(onboardingRepository.hasCompletedWelcome())
+    }
+
+    @Test
+    fun backPress_fromUsageGate_afterPermissionRevocation_doesNotRouteToWelcomeOrHome() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+
+        // For returning user with revoked permission, gate BackHandler must be disabled
+        assertFalse(
+            "BackHandler must not be enabled when gate did not originate from Welcome",
+            composeTestRule.activity.onBackPressedDispatcher.hasEnabledCallbacks()
+        )
+
+        // Calling back press must not route to Welcome or Main
+        composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+        assertTrue(onboardingRepository.hasCompletedWelcome())
+    }
+
+    @Test
+    fun recheckPermission_whenPermissionMissing_displaysGuidanceBannerAndRemainsOnGate() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Recheck Permission").performScrollTo().performClick()
+
+        // Guidance banner appears and user stays on gate
+        composeTestRule.onNodeWithText("Permission not detected yet. In Android Settings, find Stop Doom Scroll in the list and toggle 'Permit usage access' on.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+    }
+
+    @Test
+    fun recheckPermission_whenPermissionGranted_navigatesToMainWithoutGuidanceBanner() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+
+        // Grant permission in system
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        composeTestRule.onNodeWithText("Recheck Permission").performScrollTo().performClick()
+
+        // Must smoothly navigate to Main dashboard
+        composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertIsDisplayed()
+    }
+
+    @Test
+    fun onResume_withPermissionGranted_automaticallyRoutesToMain() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+
+        // User granted permission in Android Settings and returns to app
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        // Simulate returning to foreground (ON_RESUME)
+        composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+
+        // AppNavigation ON_RESUME observer routes directly to Main
+        composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertIsDisplayed()
+    }
+
+    @Test
+    fun onResume_withPermissionRevoked_redirectsToGate() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        // On Main dashboard
+        composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
+
+        // Permission revoked while app was backgrounded
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+
+        // App returns to foreground
+        composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+
+        // Must redirect to mandatory Usage Access Gate
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
     }
 }
 

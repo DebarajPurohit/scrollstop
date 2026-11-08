@@ -53,6 +53,10 @@
 4. **Returning Users**:
    - If a returning user (Standard or Guest) already has Usage Access granted, they bypass the gate screen and land directly on the Home Dashboard.
    - If a returning user previously revoked Usage Access in Android Settings, they are caught by the gate on resume and must re-grant it before accessing Home.
+5. **Back Navigation Rules at Permission Gate**:
+   - During first-time onboarding (navigated from Welcome), pressing the device back button returns the user to the Welcome screen and resets welcome completion so they can choose their entry option again.
+   - For returning users who arrived at the gate due to permission revocation or fresh launch with missing permission, the gate `BackHandler` is inactive (`enabled = false`), allowing default Android system back behavior (minimizing/exiting the app) without trapping the user and without bypassing to Home.
+   - Back navigation never navigates to Home without verified Usage Access under any condition.
 
 ---
 

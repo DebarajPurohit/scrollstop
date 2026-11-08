@@ -100,6 +100,7 @@ fun AppNavigation(
     }
     var currentScreen by remember { mutableStateOf<Screen>(initialScreen) }
     var previousScreen by remember { mutableStateOf<Screen>(initialScreen) }
+    var gateEnteredFromWelcome by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
 
     val mainViewModel = remember(
@@ -147,9 +148,11 @@ fun AppNavigation(
 
                 val hasPermission = usageStatsRepository.hasUsagePermission()
                 if (currentScreen is Screen.UsageAccessGate && hasPermission) {
+                    gateEnteredFromWelcome = false
                     currentScreen = Screen.Main
                 } else if (onboardingRepository.hasCompletedWelcome() && !hasPermission && currentScreen !is Screen.Blocking) {
                     // Usage Access was revoked while app was backgrounded: route directly to mandatory gate
+                    gateEnteredFromWelcome = false
                     currentScreen = Screen.UsageAccessGate
                 }
 
@@ -194,41 +197,43 @@ fun AppNavigation(
             WelcomeScreen(
                 onGetStarted = {
                     onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_STANDARD)
-                    currentScreen = if (usageStatsRepository.hasUsagePermission()) {
-                        Screen.Main
+                    if (usageStatsRepository.hasUsagePermission()) {
+                        gateEnteredFromWelcome = false
+                        currentScreen = Screen.Main
                     } else {
-                        Screen.UsageAccessGate
+                        gateEnteredFromWelcome = true
+                        currentScreen = Screen.UsageAccessGate
                     }
                 },
                 onContinueAsGuest = {
                     onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
-                    currentScreen = if (usageStatsRepository.hasUsagePermission()) {
-                        Screen.Main
+                    if (usageStatsRepository.hasUsagePermission()) {
+                        gateEnteredFromWelcome = false
+                        currentScreen = Screen.Main
                     } else {
-                        Screen.UsageAccessGate
+                        gateEnteredFromWelcome = true
+                        currentScreen = Screen.UsageAccessGate
                     }
                 }
             )
         }
         is Screen.UsageAccessGate -> {
-            val hasPermission = usageStatsRepository.hasUsagePermission()
-            BackHandler {
-                if (!onboardingRepository.hasCompletedWelcome()) {
-                    currentScreen = Screen.Welcome
-                }
+            BackHandler(enabled = gateEnteredFromWelcome) {
+                onboardingRepository.setWelcomeCompleted(false)
+                gateEnteredFromWelcome = false
+                currentScreen = Screen.Welcome
             }
             UsageAccessGateScreen(
-                hasPermission = hasPermission,
                 onOpenSettings = {
                     mainViewModel.openUsageAccessSettings(context)
                 },
                 onRecheckPermission = {
-                    if (usageStatsRepository.hasUsagePermission()) {
+                    val granted = usageStatsRepository.hasUsagePermission()
+                    if (granted) {
+                        gateEnteredFromWelcome = false
                         currentScreen = Screen.Main
                     }
-                },
-                onPermissionGranted = {
-                    currentScreen = Screen.Main
+                    granted
                 }
             )
         }
@@ -290,6 +295,7 @@ fun AppNavigation(
                     currentScreen = Screen.Main
                 },
                 onRequestUsagePermission = {
+                    gateEnteredFromWelcome = false
                     currentScreen = Screen.UsageAccessGate
                 },
                 bottomBar = {

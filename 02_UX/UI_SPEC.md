@@ -64,11 +64,16 @@ Entry & Gating Flow:
   3. **Primary Action**:
      - `Open Android Settings` button: Deep-links directly to `Settings.ACTION_USAGE_ACCESS_SETTINGS`.
   4. **Secondary / Verification Action**:
-     - `Check Again` button: Manually triggers an immediate query to `AppOpsManager`.
+     - `Recheck Permission` button: Queries runtime platform permission state synchronously, returning fresh Boolean result.
+     - If verified: Routes immediately to Home Dashboard without displaying warning banner.
+     - If not verified: Sets local grant-attempt state and reveals diagnostic warning banner.
   5. **Auto-Verification on Return**:
-     - Automatically verifies permission state via lifecycle `ON_RESUME` when the user navigates back from system Settings.
+     - Authoritative verification via `AppNavigation` lifecycle `ON_RESUME` when the user navigates back from system Settings.
      - If verified: Automatically routes forward to the **Home Dashboard**.
-     - If not verified: Remains on screen and displays guidance: "Permission not detected yet. Please locate Stop Doom Scroll in the list and toggle 'Permit usage access' on."
+     - If not verified: Remains on screen and displays guidance: "Permission not detected yet. In Android Settings, find Stop Doom Scroll in the list and toggle 'Permit usage access' on."
+  6. **Back Navigation Guard**:
+     - First-time onboarding: Back button safely returns user to the Welcome screen and resets welcome completion.
+     - Returning / revoked user: `BackHandler` is inactive (`enabled = false`), allowing default Android system exit/minimize behavior without trapping the user and without bypassing to Home.
 
 ### 3.3 Home Dashboard Screen (First Main Screen Post-Permission)
 - **Purpose**: Central command center providing instant visibility into device screen time, monitored app consumption, and enforcement status.

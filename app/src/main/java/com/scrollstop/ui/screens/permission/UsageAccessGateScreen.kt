@@ -68,36 +68,16 @@ import com.scrollstop.ui.theme.ThemeMode
  * Implements strict gating architecture from UI_SPEC.md §3.2 and USER_FLOWS.md §1:
  * - Cannot be skipped or bypassed.
  * - Deep-links to system Settings.ACTION_USAGE_ACCESS_SETTINGS.
- * - Automatically rechecks permission state on ON_RESUME.
- * - Provides explicit "Recheck Permission" action.
+ * - Provides explicit "Recheck Permission" action returning fresh platform status.
  * - Clearly explains why Usage Access is needed, local-only processing, and separation from Accessibility.
  */
 @Composable
 fun UsageAccessGateScreen(
-    hasPermission: Boolean,
     onOpenSettings: () -> Unit,
-    onRecheckPermission: () -> Unit,
-    onPermissionGranted: () -> Unit,
+    onRecheckPermission: () -> Boolean,
     modifier: Modifier = Modifier
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
     var hasAttemptedGrant by remember { mutableStateOf(false) }
-
-    // Auto-verify on ON_RESUME when returning from Android System Settings
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                onRecheckPermission()
-                if (hasPermission) {
-                    onPermissionGranted()
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -154,7 +134,7 @@ fun UsageAccessGateScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Diagnostic guidance banner if user attempted grant but permission is still missing
-                if (hasAttemptedGrant && !hasPermission) {
+                if (hasAttemptedGrant) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
@@ -256,10 +236,8 @@ fun UsageAccessGateScreen(
                 // Secondary Action: Recheck Permission
                 OutlinedButton(
                     onClick = {
-                        onRecheckPermission()
-                        if (hasPermission) {
-                            onPermissionGranted()
-                        } else {
+                        val isGranted = onRecheckPermission()
+                        if (!isGranted) {
                             hasAttemptedGrant = true
                         }
                     },
@@ -427,15 +405,37 @@ private fun GateShieldBadge(modifier: Modifier = Modifier) {
     }
 }
 
+@Deprecated("Use new signature without stale hasPermission and onPermissionGranted parameters")
+@Composable
+fun UsageAccessGateScreen(
+    hasPermission: Boolean,
+    onOpenSettings: () -> Unit,
+    onRecheckPermission: () -> Unit,
+    onPermissionGranted: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    UsageAccessGateScreen(
+        onOpenSettings = onOpenSettings,
+        onRecheckPermission = {
+            onRecheckPermission()
+            if (hasPermission) {
+                onPermissionGranted()
+                true
+            } else {
+                false
+            }
+        },
+        modifier = modifier
+    )
+}
+
 @Preview(name = "Light Mode", showBackground = true)
 @Composable
 private fun UsageAccessGateScreenLightPreview() {
     StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
         UsageAccessGateScreen(
-            hasPermission = false,
             onOpenSettings = {},
-            onRecheckPermission = {},
-            onPermissionGranted = {}
+            onRecheckPermission = { false }
         )
     }
 }
@@ -445,10 +445,8 @@ private fun UsageAccessGateScreenLightPreview() {
 private fun UsageAccessGateScreenDarkPreview() {
     StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
         UsageAccessGateScreen(
-            hasPermission = false,
             onOpenSettings = {},
-            onRecheckPermission = {},
-            onPermissionGranted = {}
+            onRecheckPermission = { false }
         )
     }
 }

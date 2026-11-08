@@ -1,14 +1,14 @@
 # Project Status
 
-**Date:** 2026-11-07\
-**Stage:** Phase 1: Welcome Screen & Mandatory Usage Access Gate Implemented (363 AUTOMATED TESTS PASS)
+**Date:** 2026-11-08\
+**Stage:** Phase 1: Welcome Screen & Mandatory Usage Access Gate — Defect A & B Resolved (369 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
-- **Stop Doom Scroll — Phase 1: Welcome Screen & Mandatory Usage Access Gate Implemented**: PASS
+- **Stop Doom Scroll — Phase 1: Welcome Screen & Mandatory Usage Access Gate (Defects A & B Resolved)**: PASS
   - **Implementation Delivered**:
     1. **Welcome Screen (`WelcomeScreen.kt`)**:
        - Designed and built with the approved Bold Modern visual direction, Balanced layout density, Motivational personality, Slate/Emerald color tokens, and full Light & Dark mode support.
@@ -22,19 +22,18 @@
          * *100% Local-First Privacy*: On-device processing with zero cloud sync.
          * *Separate from Accessibility*: Usage Access is for time tracking; Accessibility is for blocking enforcement.
        - Action controls: Primary "Grant Usage Access" (launches Android system `ACTION_USAGE_ACCESS_SETTINGS`) and secondary "Recheck Permission" (evaluates runtime status).
-       - Contextual guidance banner displayed if permission check fails after an attempt.
-       - Lifecycle observer (`LifecycleEventObserver`) automatically verifying permission on `ON_RESUME` when returning from Android system settings.
+       - **Defect B Resolution**: Removed inner redundant `LifecycleEventObserver` from `UsageAccessGateScreen` to ensure `AppNavigation` remains the single authoritative lifecycle observer. Updated `onRecheckPermission: () -> Boolean` to query runtime platform status synchronously; if granted, navigates to Home immediately; if not, triggers the warning guidance banner. Eliminated stale boolean parameters.
        - Strict gate enforcement: No skip, dismiss, or bypass actions.
     3. **Navigation Integration (`AppNavigation.kt`)**:
        - `Screen.Welcome` and `Screen.UsageAccessGate` added to the navigation hierarchy.
        - Entry routing evaluates `onboardingRepository.hasCompletedWelcome()` and `usageStatsRepository.hasUsagePermission()`.
        - Users cannot reach `Screen.Main` (Home dashboard) without verified Usage Access.
+       - **Defect A Resolution**: Added `gateEnteredFromWelcome` origin tracking. For first-time onboarding from Welcome, device Back safely returns to Welcome and resets welcome completion. For returning users whose permission was revoked or missing, gate `BackHandler` is inactive (`enabled = false`), allowing Android system back/minimize behavior without trapping the user and without bypassing to Home.
        - Dynamic `ON_RESUME` re-verification: If a user revokes Usage Access in Android Settings while the app is in the background, returning to the app immediately routes back to `Screen.UsageAccessGate`.
     4. **Automated Verification**:
-       - Created comprehensive test suite `WelcomeAndUsageGateTest.kt` covering 15 test cases (Light/Dark themes, Guest and Get Started flows, education cards, grant and recheck callbacks, guidance banner, repository defaults and persistence, and end-to-end navigation flows).
-       - Updated existing `AppNavigationTest.kt` preconditions to reflect authenticated and permission-granted states.
-       - Full unit test suite passes: **363 tests passed, 0 failures**.
-       - Both `assembleDebug` and `assembleRelease` (with R8 and lintVital) build successfully with zero errors.
+       - Comprehensive test suite `WelcomeAndUsageGateTest.kt` expanded to 21 test cases (Light/Dark themes, Guest and Get Started flows, education cards, grant and recheck callbacks, guidance banner, repository defaults and persistence, Defect A back navigation during first onboarding, Defect A back navigation after revocation, Defect B recheck when missing, Defect B recheck when granted, Defect B lifecycle ON_RESUME auto-routing to Main, and Defect B lifecycle ON_RESUME revocation redirect).
+       - Full unit test suite passes: **369 tests passed, 0 failures**.
+       - Both `assembleDebug` builds successfully with zero errors.
 - **Stop Doom Scroll — Critical Usage Calculation Audit Resolved**: PASS
   - **Reproduction & Symptom**:
     - Physical device screenshot dated 1 Nov 2026, ~10:28 PM showed:
