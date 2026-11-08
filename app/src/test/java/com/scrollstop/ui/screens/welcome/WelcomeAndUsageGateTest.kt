@@ -59,7 +59,7 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
                 WelcomeScreen(
-                    onContinueWithGoogle = {},
+                    onGetStarted = {},
                     onContinueAsGuest = {}
                 )
             }
@@ -68,9 +68,9 @@ class WelcomeAndUsageGateTest {
         composeTestRule.onNodeWithText("STOP DOOM SCROLL").assertIsDisplayed()
         composeTestRule.onNodeWithText("Reclaim your focus.\nBreak the scroll loop.").assertIsDisplayed()
         composeTestRule.onNodeWithText("100% Local-First • Zero Cloud Sync").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Continue with Google").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Continue as Guest").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Stop Doom Scroll works completely offline. Sign-in is optional.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Stop Doom Scroll works completely offline. No account required.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -78,14 +78,14 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
                 WelcomeScreen(
-                    onContinueWithGoogle = {},
+                    onGetStarted = {},
                     onContinueAsGuest = {}
                 )
             }
         }
 
         composeTestRule.onNodeWithText("STOP DOOM SCROLL").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Continue with Google").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Continue as Guest").performScrollTo().assertIsDisplayed()
     }
 
@@ -96,7 +96,7 @@ class WelcomeAndUsageGateTest {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 WelcomeScreen(
-                    onContinueWithGoogle = {},
+                    onGetStarted = {},
                     onContinueAsGuest = { guestClicked = true }
                 )
             }
@@ -107,20 +107,20 @@ class WelcomeAndUsageGateTest {
     }
 
     @Test
-    fun welcomeScreen_clickingContinueWithGoogle_invokesCallback() {
-        var googleClicked = false
+    fun welcomeScreen_clickingGetStarted_invokesCallback() {
+        var getStartedClicked = false
 
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 WelcomeScreen(
-                    onContinueWithGoogle = { googleClicked = true },
+                    onGetStarted = { getStartedClicked = true },
                     onContinueAsGuest = {}
                 )
             }
         }
 
-        composeTestRule.onNodeWithText("Continue with Google").performScrollTo().performClick()
-        assertTrue("onContinueWithGoogle must be invoked on click", googleClicked)
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().performClick()
+        assertTrue("onGetStarted must be invoked on click", getStartedClicked)
     }
 
     // --- USAGE ACCESS GATE SCREEN TESTS ---
@@ -215,9 +215,9 @@ class WelcomeAndUsageGateTest {
 
     @Test
     fun onboardingRepository_persistsWelcomeCompletionAndSessionType() {
-        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GOOGLE)
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_STANDARD)
         assertTrue(onboardingRepository.hasCompletedWelcome())
-        assertEquals(OnboardingRepository.SESSION_TYPE_GOOGLE, onboardingRepository.getSessionType())
+        assertEquals(OnboardingRepository.SESSION_TYPE_STANDARD, onboardingRepository.getSessionType())
 
         onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
         assertTrue(onboardingRepository.hasCompletedWelcome())
@@ -315,7 +315,7 @@ class WelcomeAndUsageGateTest {
     }
 
     @Test
-    fun navigationFlow_clickingGoogleOnWelcome_transitionsToUsageGate_whenPermissionMissing() {
+    fun navigationFlow_clickingGetStartedOnWelcome_transitionsToUsageGate_whenPermissionMissing() {
         Shadows.shadowOf(appOpsManager).setMode(
             AppOpsManager.OPSTR_GET_USAGE_STATS,
             Process.myUid(),
@@ -330,11 +330,11 @@ class WelcomeAndUsageGateTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Continue with Google").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().performClick()
         // Must immediately transition to Usage Access Gate screen
         composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
         assertTrue(onboardingRepository.hasCompletedWelcome())
-        assertEquals(OnboardingRepository.SESSION_TYPE_GOOGLE, onboardingRepository.getSessionType())
+        assertEquals(OnboardingRepository.SESSION_TYPE_STANDARD, onboardingRepository.getSessionType())
     }
 }
 

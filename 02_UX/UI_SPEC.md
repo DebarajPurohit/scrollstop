@@ -4,7 +4,7 @@
 
 - **Visual Style**: Premium minimalist — calm, distraction-free, intentional typography, uncluttered surfaces, and purposeful whitespace.
 - **Theme Behavior**: Follows Android system theme by default (Material You dynamic wallpaper coloring disabled to preserve brand integrity). Manual override available in Settings: **System Default**, **Light**, or **Dark**.
-- **Mandatory Usage Access Gate**: **Usage Access is mandatory prior to entering Home.** Immediately after selecting "Continue with Google" or "Continue as guest", the user must grant Usage Access before Home can be accessed. If access is not confirmed, the user remains on the permission gate screen.
+- **Mandatory Usage Access Gate**: **Usage Access is mandatory prior to entering Home.** Immediately after selecting "Get Started" or "Continue as guest", the user must grant Usage Access before Home can be accessed. If access is not confirmed, the user remains on the permission gate screen.
 - **Separation of Permissions**:
   - **Usage Access**: Prerequisite for Home; required to compute daily screen time, render the 7-day total usage chart, and populate app usage statistics.
   - **Accessibility Service**: Separate, subsequent setup step; required specifically for foreground app detection and blocking enforcement, not for reading usage stats.
@@ -31,7 +31,7 @@ Persistent bottom navigation with four primary top-level destinations (unlocked 
 4. **Settings**: Theme selection, account / Google sign-in status, protection health diagnostic links, privacy policy, and about.
 
 Entry & Gating Flow:
-- **Welcome / Entry Screen**: Presented on first launch: "Continue with Google" or "Continue as guest".
+- **Welcome / Entry Screen**: Presented on first launch: "Get Started" or "Continue as guest".
 - **Usage Access Permission Gate Screen**: Enforced permission gate immediately following entry. Blocks access to Home until permission is verified.
 - **Blocking Screen**: Enforced modal intercept when a restricted app exceeds its daily limit. Intercepts back navigation to keep user in safe Stop Doom Scroll environment.
 - **Accessibility Prominent Disclosure Screen**: Dedicated contextual disclosure detailing narrow accessibility usage and privacy guarantees prior to launching system settings.
@@ -41,14 +41,14 @@ Entry & Gating Flow:
 ## 3. Screen Specifications
 
 ### 3.1 Welcome & Entry Screen
-- **Purpose**: Low-friction entry offering optional identity without blocking app utility.
+- **Purpose**: Low-friction first-entry experience without misleading authentication claims.
 - **Primary Actions**:
-  - `Continue with Google` (One-tap / Credential Manager sign-in).
+  - `Get Started` (Initiates local protection setup).
   - `Continue as guest` (Direct entry to Usage Access gate, zero personal data collected).
 - **Key UX Rules**:
-  - No forced account creation, passwords, or intrusive forms.
-  - Guest users receive identical local functionality.
-  - Explanatory subtext: "Stop Doom Scroll works completely offline. Sign-in is optional."
+  - No forced account creation, fake login, or deceptive authentication buttons.
+  - Guest and standard users receive identical local functionality.
+  - Explanatory subtext: "Stop Doom Scroll works completely offline. No account required."
   - Selecting either option transitions immediately to the **Usage Access Permission Gate Screen**.
 
 ### 3.2 Usage Access Permission Gate Screen (Mandatory Prerequisite)
@@ -204,7 +204,7 @@ Entry & Gating Flow:
 ## 6. Acceptance Criteria for Redesigned UI
 
 1. **Mandatory Usage Access Gate**:
-   - Immediately following "Continue with Google" or "Continue as guest", the user is routed to the Usage Access permission gate.
+   - Immediately following "Get Started" or "Continue as guest", the user is routed to the Usage Access permission gate.
    - Access to Home, Limits, History, and Settings is strictly blocked until Usage Access is verified.
    - Returning from Android Settings re-evaluates permission state automatically (`ON_RESUME`). If denied, the user remains on the gate screen with clear instructions and an explicit "Check Again" action.
 2. **First-Time Users & Incomplete History Handling**:

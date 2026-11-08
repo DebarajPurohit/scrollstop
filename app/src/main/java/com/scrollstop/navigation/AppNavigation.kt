@@ -192,8 +192,8 @@ fun AppNavigation(
     when (val screen = currentScreen) {
         is Screen.Welcome -> {
             WelcomeScreen(
-                onContinueWithGoogle = {
-                    onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GOOGLE)
+                onGetStarted = {
+                    onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_STANDARD)
                     currentScreen = if (usageStatsRepository.hasUsagePermission()) {
                         Screen.Main
                     } else {

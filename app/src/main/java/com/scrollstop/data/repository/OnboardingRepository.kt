@@ -11,6 +11,8 @@ interface OnboardingRepository {
 
     companion object {
         const val SESSION_TYPE_GUEST = "GUEST"
+        const val SESSION_TYPE_STANDARD = "STANDARD"
+        @Deprecated("Replaced with SESSION_TYPE_STANDARD to avoid misleading authentication implying", ReplaceWith("SESSION_TYPE_STANDARD"))
         const val SESSION_TYPE_GOOGLE = "GOOGLE"
     }
 }

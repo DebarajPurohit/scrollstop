@@ -56,13 +56,13 @@ import com.scrollstop.ui.theme.ThemeMode
  * Implements the approved Bold Modern Stitch visual direction:
  * - Clear identity communicating control over scrolling habits.
  * - Explains intentional limits, active tracking, and firm blocking.
- * - Primary Action: "Continue with Google" (optional authentication).
+ * - Primary Action: "Get Started" (initiates local protection setup).
  * - Secondary Action: "Continue as Guest" (instant offline access).
  * - 100% accessible touch targets (>= 48dp) and contrast compliant in Light and Dark themes.
  */
 @Composable
 fun WelcomeScreen(
-    onContinueWithGoogle: () -> Unit,
+    onGetStarted: () -> Unit,
     onContinueAsGuest: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -155,15 +155,15 @@ fun WelcomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Primary: Continue with Google
+                // Primary: Get Started
                 Button(
-                    onClick = onContinueWithGoogle,
+                    onClick = onGetStarted,
                     modifier = Modifier
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = 52.dp)
                         .semantics {
                             role = Role.Button
-                            contentDescription = "Continue with Google"
+                            contentDescription = "Get Started"
                         },
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -175,10 +175,10 @@ fun WelcomeScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
-                        GoogleGIcon(modifier = Modifier.size(20.dp))
+                        ArrowForwardIcon(modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Continue with Google",
+                            text = "Get Started",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -214,7 +214,7 @@ fun WelcomeScreen(
 
                 // Explanatory footnote
                 Text(
-                    text = "Stop Doom Scroll works completely offline. Sign-in is optional.",
+                    text = "Stop Doom Scroll works completely offline. No account required.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -295,32 +295,23 @@ private fun WelcomeBrandBadge(modifier: Modifier = Modifier) {
 }
 
 /**
- * Clean vector stylized Google "G" icon without external bitmap asset dependencies.
+ * Forward arrow icon cleanly rendered with Canvas without external bitmap dependencies.
  */
 @Composable
-private fun GoogleGIcon(modifier: Modifier = Modifier) {
+private fun ArrowForwardIcon(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         val strokeWidth = 2.5.dp.toPx()
-        val radius = (size.minDimension - strokeWidth) / 2f
-        val center = Offset(size.width / 2f, size.height / 2f)
-
-        // Arc for G
-        drawArc(
+        val path = Path().apply {
+            moveTo(size.width * 0.22f, size.height * 0.5f)
+            lineTo(size.width * 0.72f, size.height * 0.5f)
+            moveTo(size.width * 0.50f, size.height * 0.28f)
+            lineTo(size.width * 0.72f, size.height * 0.5f)
+            lineTo(size.width * 0.50f, size.height * 0.72f)
+        }
+        drawPath(
+            path = path,
             color = Color.White,
-            startAngle = 45f,
-            sweepAngle = 270f,
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-        )
-        // Horizontal bar
-        drawLine(
-            color = Color.White,
-            start = Offset(center.x, center.y),
-            end = Offset(center.x + radius, center.y),
-            strokeWidth = strokeWidth,
-            cap = StrokeCap.Round
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
     }
 }
@@ -330,7 +321,7 @@ private fun GoogleGIcon(modifier: Modifier = Modifier) {
 private fun WelcomeScreenLightPreview() {
     StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
         WelcomeScreen(
-            onContinueWithGoogle = {},
+            onGetStarted = {},
             onContinueAsGuest = {}
         )
     }
@@ -341,7 +332,7 @@ private fun WelcomeScreenLightPreview() {
 private fun WelcomeScreenDarkPreview() {
     StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
         WelcomeScreen(
-            onContinueWithGoogle = {},
+            onGetStarted = {},
             onContinueAsGuest = {}
         )
     }

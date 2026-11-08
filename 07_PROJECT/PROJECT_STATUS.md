@@ -12,8 +12,8 @@
   - **Implementation Delivered**:
     1. **Welcome Screen (`WelcomeScreen.kt`)**:
        - Designed and built with the approved Bold Modern visual direction, Balanced layout density, Motivational personality, Slate/Emerald color tokens, and full Light & Dark mode support.
-       - App branding badge (`STOP DOOM SCROLL`), headline ("Reclaim your focus. Break the scroll loop."), concise motivational description, local-first privacy badge ("100% Local-First • Zero Cloud Sync"), and disclaimer ("Stop Doom Scroll works completely offline. Sign-in is optional.").
-       - Two entry options: Primary "Continue with Google" and secondary "Continue as Guest", with touch targets $\ge 48\text{dp}$.
+       - App branding badge (`STOP DOOM SCROLL`), headline ("Reclaim your focus. Break the scroll loop."), concise motivational description, local-first privacy badge ("100% Local-First • Zero Cloud Sync"), and disclaimer ("Stop Doom Scroll works completely offline. No account required.").
+       - Two clearly labelled entry options: Primary "Get Started" (initiates standard local protection setup) and secondary "Continue as Guest" (direct local offline entry), with touch targets $\ge 48\text{dp}$. Removed misleading "Continue with Google" action to ensure honest, transparent UX without implying remote authentication.
        - Implemented clean local onboarding persistence via `OnboardingRepository` (`SharedPreferencesOnboardingRepository`), preserving local-first offline architecture without premature auth dependencies.
     2. **Mandatory Usage Access Gate Screen (`UsageAccessGateScreen.kt`)**:
        - Dedicated permission gate with prominent shield header ("USAGE ACCESS REQUIRED") and 4 educational cards explaining:
@@ -31,7 +31,7 @@
        - Users cannot reach `Screen.Main` (Home dashboard) without verified Usage Access.
        - Dynamic `ON_RESUME` re-verification: If a user revokes Usage Access in Android Settings while the app is in the background, returning to the app immediately routes back to `Screen.UsageAccessGate`.
     4. **Automated Verification**:
-       - Created comprehensive test suite `WelcomeAndUsageGateTest.kt` covering 15 test cases (Light/Dark themes, Guest and Google flows, education cards, grant and recheck callbacks, guidance banner, repository defaults and persistence, and end-to-end navigation flows).
+       - Created comprehensive test suite `WelcomeAndUsageGateTest.kt` covering 15 test cases (Light/Dark themes, Guest and Get Started flows, education cards, grant and recheck callbacks, guidance banner, repository defaults and persistence, and end-to-end navigation flows).
        - Updated existing `AppNavigationTest.kt` preconditions to reflect authenticated and permission-granted states.
        - Full unit test suite passes: **363 tests passed, 0 failures**.
        - Both `assembleDebug` and `assembleRelease` (with R8 and lintVital) build successfully with zero errors.

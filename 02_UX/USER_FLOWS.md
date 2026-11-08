@@ -7,12 +7,12 @@
       │
       ├──────────────────────────────┬──────────────────────────────┐
       ▼                              ▼                              ▼
-[First Launch: Welcome Screen]  [Returning User: Guest]    [Returning User: Google]
+[First Launch: Welcome Screen]  [Returning User: Standard] [Returning User: Guest]
       │                              │                              │
       ├───────────────┐              │                              │
       ▼               ▼              │                              │
-[Continue with  [Continue as         │                              │
-   Google]         Guest]            │                              │
+[Get Started]   [Continue as         │                              │
+                   Guest]            │                              │
       │               │              │                              │
       └───────┬───────┘              │                              │
               ▼                      │                              │
@@ -38,22 +38,21 @@
 
 ### Step-by-Step Flow:
 1. **Welcome Screen**:
-   - Choice A: **Continue with Google** — Authenticates via Android Credential Manager / Google Sign-In. Strict local-first boundary preserved; no cloud sync of usage data is initiated.
+   - Choice A: **Get Started** — Initiates standard offline protection setup without implying remote authentication.
    - Choice B: **Continue as guest** — Instant guest session initialization without an account.
 2. **Mandatory Usage Access Gate**:
    - Immediately following either choice (and on subsequent app launches if Usage Access is missing), the application routes to the **Usage Access Permission Screen**.
    - **Gating Rule**: The user **must** grant Usage Access before entering Home.
    - **Explanation Provided**: Clearly explains that Stop Doom Scroll requires Usage Access strictly on-device to measure daily screen time and compute 7-day usage trends. Reassures user that data remains private and local.
-   - Action: "Open Settings" deep-links directly to `Settings.ACTION_USAGE_ACCESS_SETTINGS`.
+   - Action: "Grant Usage Access" deep-links directly to `Settings.ACTION_USAGE_ACCESS_SETTINGS`.
 3. **Verification on Return**:
    - On returning from Android Settings (via lifecycle `ON_RESUME`), the app immediately queries `AppOpsManager` to verify permission state.
-   - An explicit "Check Again" action is also provided.
+   - An explicit "Recheck Permission" action is also provided.
    - If granted: App smoothly transitions into the **Home Dashboard**.
    - If NOT granted: App remains on the permission screen, displays clear guidance on how to enable the toggle in Android Settings, and refuses navigation into Home.
 4. **Returning Users**:
-   - If a returning user (Guest or Google) already has Usage Access granted, they bypass the gate screen and land directly on the Home Dashboard.
-   - If a returning user previously revoked Usage Access in Android Settings, they are caught by the gate and must re-grant it before accessing Home.
-5. **Optional Sign-In Later**: A guest user can at any time navigate to **Settings** and link a Google account without losing any local limits, history, or configurations.
+   - If a returning user (Standard or Guest) already has Usage Access granted, they bypass the gate screen and land directly on the Home Dashboard.
+   - If a returning user previously revoked Usage Access in Android Settings, they are caught by the gate on resume and must re-grant it before accessing Home.
 
 ---
 
