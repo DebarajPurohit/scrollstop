@@ -1,13 +1,50 @@
 # Project Status
 
 **Date:** 2026-11-09\
-**Stage:** Phase 1: Welcome Screen & Mandatory Usage Access Gate — Final Back Navigation Fixed (373 AUTOMATED TESTS PASS)
+**Stage:** Phase 2: Home Dashboard & Guided Protection Setup Implementation Complete (381 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 2: Home Dashboard & Guided Protection Setup Implementation**: PASS
+  - **Implementation Delivered**:
+    1. **Approved Design Language & Theme System**:
+       - Implemented Bold Modern visual direction, Balanced layout density, Motivational personality, Slate/Emerald color tokens, Material 3, and strict touch target compliance ($\ge 48\text{dp}$).
+       - Seamless Light, Dark, and System Default appearance using dynamic theme tokens without hardcoded colors.
+    2. **Top Header**:
+       - Title (`Stop Doom Scroll`), motivational tagline (`Set your limit. When your time is up, we stop you.`), accessible Settings entry (opening `ThemeSelectionDialog`), and manual Refresh action (`contentDescription = "Refresh Dashboard Usage"`).
+    3. **Protection Status Card (`ProtectionStatusCard`)**:
+       - Grounded in authoritative platform state (`PROTECTED`, `ACCESSIBILITY_REQUIRED`, `ACCESSIBILITY_INTERRUPTED`, `SETUP_REQUIRED`, `USAGE_ACCESS_REQUIRED`).
+       - Never claims active protection unless confirmed active by repositories/services and at least one application is selected.
+       - Contextually reveals `SETUP REQUIRED` state with actionable "Choose Apps to Control" button when no apps are monitored.
+    4. **Guided Protection Setup (`GuidedProtectionSetupCard`)**:
+       - Embedded, non-blocking contextual checklist guiding the user through complete setup:
+         * *Step 1: Choose Apps to Control* (Navigates to `Screen.Limits` app selection)
+         * *Step 2: Set Daily Limits* (Navigates to `Screen.Limits` configuration)
+         * *Step 3: Enable Accessibility Service* (Navigates to `Screen.AccessibilityConsent`)
+         * *Step 4: Active Protection* (Shows active or pending status)
+       - Automatically collapses/hides when all protection steps are completed.
+    5. **Today's Screen Time Hero Metric Card (`HeroScreenTimeCard`)**:
+       - Authoritative total device screen time (`todayScreenTimeMs`), human-readable duration format (`3h 42m`), and descriptive subtitle ("Total phone screen time across all applications today").
+       - Contextual status badge: comparison against 7-day daily average ("30m under daily avg" or "+X vs daily avg") or target allowance, with honest handling for loading ("Calculating…") and missing permission ("Permission Required"). Never confuses total phone screen time with monitored apps usage.
+    6. **7-Day Total Device Usage Bar Chart (`SevenDayUsageChart`)**:
+       - Bar chart with clear day labels, distinguishing today, honest "No data" for unrecorded days without fabricating zero minutes, "X of 7 days recorded" badge, and average calculated strictly over valid recorded days.
+    7. **Monitored Applications Breakdown (`MonitoredApplicationsCard`)**:
+       - Ranked list of monitored apps sorted by today's consumption.
+       - Displays app icon (40dp with fallback thumbnail), label, today's usage, configured daily limit, progress bar (`UsageProgressBar`), and cumulative observation window (e.g. `(7d)` or `(2d of data)`).
+       - **Pending Midnight Badges**: Displays warning badges for apps staged for removal ("Removal at midnight") or limit increase ("New limit: X at midnight").
+       - Clean motivational empty state when no apps are selected with direct CTA button.
+       - Bottom CTA "Configure Limits & Add Apps" navigating directly to Limits tab.
+    8. **Commitment Lock Card (`CommitmentStatusCard`)**:
+       - Displays actual commitment state (`ACTIVE` / `INACTIVE`), plain-language explanation of midnight reset rules, staged pending relaxations container (listing packages staged for removal or limit increase at midnight), and actionable buttons (Enable / Request Unlock / Cancel Unlock).
+    9. **Preserved Core Enforcement**:
+       - Zero modifications to `UsageRuleEngine`, `CommitmentRuleEngine`, `RestrictedAppAccessibilityService`, `EnforcementRecovery`, blocking interception, or midnight reset logic.
+    10. **Automated Verification**:
+       - Added 8 new unit tests in `MainScreenHealthUiTest.kt` verifying guided setup states, transitions, empty states, pending midnight badges, and comparison badges.
+       - Full unit test suite passes: **381 tests passed, 0 failures** (`./gradlew testDebugUnitTest`).
+       - Both `assembleDebug` (22s) and `assembleRelease` (1m 55s, R8 + lintVital) build successfully with zero errors.
 - **Stop Doom Scroll — Phase 1: Welcome Screen & Mandatory Usage Access Gate (Final Back Navigation Resolved)**: PASS
   - **Implementation Delivered**:
     1. **Welcome Screen (`WelcomeScreen.kt`)**:

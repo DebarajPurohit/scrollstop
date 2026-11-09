@@ -231,6 +231,24 @@
 11. **Regression 11**: Manual date changes and timezone shifts (e.g. DST, travel) are dynamically handled without stale cached offsets.
 12. **Regression 12**: Both 15-minute preset and custom-duration limit enforcement continue to function reliably.
 
+### Phase 2: Home Dashboard & Guided Protection Setup Test Suite (MainScreenHealthUiTest & MainViewModelTest)
+
+1. **Dashboard Health Card - Active Protection**: Renders "PROTECTION ACTIVE" banner with active app count when health is `PROTECTED` and apps are selected.
+2. **Dashboard Health Card - Actionable Recovery**: Renders warning banner and dedicated recovery button for `USAGE_ACCESS_REQUIRED`, `ACCESSIBILITY_REQUIRED`, and `ACCESSIBILITY_INTERRUPTED`.
+3. **Dashboard Health Card - Setup Required**: Renders `SETUP REQUIRED` state with direct "Choose Apps to Control" button when 0 apps are monitored.
+4. **Guided Protection Setup - Incomplete State**: Renders 4-step checklist (Choose Apps -> Set Limits -> Enable Accessibility -> Active Protection) with step numbers, descriptions, and $\ge 48\text{dp}$ action buttons when setup is incomplete.
+5. **Guided Protection Setup - Step Progression**: Dynamically reflects completed steps with green checkmarks and updates step count badge (e.g., "1 of 3 complete").
+6. **Guided Protection Setup - Completed Auto-Collapse**: Automatically hides/collapses the setup checklist when all protection steps are completed and protection is active.
+7. **Today's Screen Time Hero Metric**: Renders authoritative total device usage duration (`todayScreenTimeMs`), clear total device usage label, and handles loading ("Calculating…") and permission required states.
+8. **Hero Metric - 7-Day Average Comparison**: Dynamically compares today's device usage against 7-day daily average, rendering "X under daily avg" or "+X vs daily avg" badges.
+9. **7-Day Bar Chart Integration**: Reusable bar chart renders solid bars for recorded days and honest "No data" for unrecorded days, with "X of 7 days recorded" badge.
+10. **Monitored Applications - Breakdown**: Displays monitored apps sorted by today's consumption with icon, label, today's usage, daily limit, observation window, and progress bar.
+11. **Monitored Applications - Empty State**: Renders motivational empty state with direct "Choose Apps to Control" button.
+12. **Monitored Applications - Pending Midnight Changes**: Displays warning badges for apps scheduled for midnight removal ("Removal at midnight") or limit increase ("New limit: X at midnight").
+13. **Commitment Lock Card - Status & Actions**: Displays active/inactive lock state, rules explanation, and allows enable, request midnight unlock, and cancel unlock actions.
+14. **Commitment Lock Card - Staged Midnight Relaxations**: Renders dedicated pending changes container displaying all staged app removals and limit increases taking effect at midnight.
+15. **Theme Engine & Appearance**: Supports Light, Dark, and System Default themes without hardcoded hex colors, with dialog theme switcher in TopBar.
+
 ## Critical Enforcement
 
 -   Limit reached while app is open

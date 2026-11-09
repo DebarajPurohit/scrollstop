@@ -1,6 +1,7 @@
 package com.scrollstop.ui.screens
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.scrollstop.data.repository.ThemeRepository
+import com.scrollstop.domain.model.CommitmentLockState
 import com.scrollstop.domain.model.DailyUsageRecord
 import com.scrollstop.domain.model.MonitoredAppUsage
 import com.scrollstop.domain.model.ProtectionHealthState
@@ -289,6 +291,216 @@ class MainScreenHealthUiTest {
         composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
         // Verify under-limit percentage is displayed
         composeTestRule.onNodeWithText("50%").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_guidedSetup_incompleteState_rendersChecklistAndNavigates() {
+        var chooseAppsClicked = false
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED,
+                        selectedAppCount = 0
+                    ),
+                    onNavigateToAppSelection = { chooseAppsClicked = true }
+                )
+            }
+        }
+
+        // Verify guided setup card is visible
+        composeTestRule.onNodeWithText("Protection Setup").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("0 of 3 complete").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Guided Setup Step 1 Choose Apps").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Set Daily Limits").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enable Accessibility Service").performScrollTo().assertIsDisplayed()
+
+        // Click choose apps action
+        composeTestRule.onNodeWithContentDescription("Guided Setup Step 1 Choose Apps").performScrollTo().performClick()
+        assertTrue(chooseAppsClicked)
+    }
+
+    @Test
+    fun mainScreen_guidedSetup_step1Completed_showsProgress() {
+        var configureLimitsClicked = false
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED,
+                        selectedAppCount = 2,
+                        monitoredApps = listOf(
+                            MonitoredAppUsage(packageName = "com.app.one", appName = "App 1", dailyLimitMs = null),
+                            MonitoredAppUsage(packageName = "com.app.two", appName = "App 2", dailyLimitMs = null)
+                        )
+                    ),
+                    onNavigateToLimits = { configureLimitsClicked = true }
+                )
+            }
+        }
+
+        // Step 1 completed, 1 of 3
+        composeTestRule.onNodeWithText("Protection Setup").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("1 of 3 complete").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("2 apps selected").performScrollTo().assertIsDisplayed()
+
+        // Step 2 pending: Set Limits
+        composeTestRule.onNodeWithContentDescription("Guided Setup Step 2 Set Limits").performScrollTo().performClick()
+        assertTrue(configureLimitsClicked)
+    }
+
+    @Test
+    fun mainScreen_guidedSetup_completedState_hidesChecklist() {
+        val monitoredApps = listOf(
+            MonitoredAppUsage(
+                packageName = "com.instagram.android",
+                appName = "Instagram",
+                dailyLimitMs = 1_800_000L
+            )
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 1,
+                        monitoredApps = monitoredApps
+                    )
+                )
+            }
+        }
+
+        // Checklist should be hidden when protection is fully configured
+        composeTestRule.onNode(hasText("Protection Setup")).assertDoesNotExist()
+        composeTestRule.onNodeWithText("PROTECTION ACTIVE").assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_protectionStatusCard_zeroSelectedApps_showsSetupRequired() {
+        var chooseAppsClicked = false
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 0
+                    ),
+                    onNavigateToAppSelection = { chooseAppsClicked = true }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("SETUP REQUIRED").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Choose distracting apps to control and configure daily limits.").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Choose Apps to Control Setup Button").performClick()
+        assertTrue(chooseAppsClicked)
+    }
+
+    @Test
+    fun mainScreen_monitoredApps_emptyState_rendersMotivationalEmptyState() {
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 0,
+                        monitoredApps = emptyList()
+                    )
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("No applications monitored yet").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Select distracting apps to set daily limits and protect your screen time.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_monitoredApps_withPendingMidnightChanges_rendersBadges() {
+        val monitoredApps = listOf(
+            MonitoredAppUsage(
+                packageName = "com.test.remove",
+                appName = "RemovableApp",
+                todayUsageMs = 600_000L,
+                dailyLimitMs = 1_800_000L,
+                pendingMidnightRemoval = true
+            ),
+            MonitoredAppUsage(
+                packageName = "com.test.increase",
+                appName = "IncreasedApp",
+                todayUsageMs = 1_200_000L,
+                dailyLimitMs = 1_800_000L,
+                pendingMidnightLimitMs = 3_600_000L
+            )
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 2,
+                        monitoredApps = monitoredApps
+                    )
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Removal at midnight").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("New limit: 1h 0m daily at midnight").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_commitmentLock_withStagedRelaxations_rendersPendingChanges() {
+        val commitmentState = CommitmentLockState(
+            isLocked = true,
+            pendingUnlock = true,
+            pendingRemovedPackages = setOf("com.insta.app"),
+            pendingIncreasedLimits = mapOf("com.yt.app" to 3_600_000L)
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 2,
+                        commitmentState = commitmentState
+                    )
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Pending Changes at Midnight Reset (12:00 AM):").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("• Unlock Commitment Lock").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("• Removal from protection: com.insta.app").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("• Limit increase: com.yt.app → 1h 0m daily").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel Unlock Request").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_heroMetric_showsComparisonAgainstSevenDayAverage() {
+        val records = listOf(
+            DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 7_200_000L, hasRecord = true), // 2h
+            DailyUsageRecord("Today", "Tue", 2L, totalScreenTimeMs = 3_600_000L, hasRecord = true, isCurrentDay = true) // 1h
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        hasUsagePermission = true,
+                        isUsageLoading = false,
+                        todayScreenTimeMs = 3_600_000L,
+                        sevenDayChartState = SevenDayChartState.Success(days = records)
+                    )
+                )
+            }
+        }
+
+        // Average is (2h + 1h) / 2 = 1h 30m. Today is 1h 0m -> diff = 30m under daily avg
+        composeTestRule.onNodeWithText("30m under daily avg").performScrollTo().assertIsDisplayed()
     }
 
     private class FakeThemeRepo(initialMode: ThemeMode = ThemeMode.SYSTEM) : ThemeRepository {

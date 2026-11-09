@@ -44,6 +44,22 @@ data class MainUiState(
             val minutes = totalMinutes % 60
             return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
         }
+
+    val isStep1AppsSelected: Boolean
+        get() = selectedAppCount > 0
+
+    val isStep2LimitsConfigured: Boolean
+        get() = monitoredApps.isNotEmpty() && monitoredApps.any { it.dailyLimitMs != null }
+
+    val isStep3AccessibilityActive: Boolean
+        get() = healthState !in listOf(
+            ProtectionHealthState.ACCESSIBILITY_REQUIRED,
+            ProtectionHealthState.ACCESSIBILITY_INTERRUPTED,
+            ProtectionHealthState.DEGRADED
+        )
+
+    val isSetupComplete: Boolean
+        get() = isStep1AppsSelected && isStep2LimitsConfigured && isStep3AccessibilityActive && healthState == ProtectionHealthState.PROTECTED
 }
 
 /**
@@ -81,6 +97,12 @@ class MainViewModel(
         commitmentLockRepository?.commitmentState ?: fallbackCommitmentFlow,
         dashboardUsageDataFlow
     ) { health, selectedApps, commitment, usageData ->
+        val annotatedApps = usageData.monitoredApps.map { app ->
+            app.copy(
+                pendingMidnightRemoval = commitment.pendingRemovedPackages.contains(app.packageName),
+                pendingMidnightLimitMs = commitment.pendingIncreasedLimits[app.packageName]
+            )
+        }
         MainUiState(
             healthState = health,
             selectedAppCount = selectedApps.size,
@@ -90,7 +112,7 @@ class MainViewModel(
             isUsageLoading = usageData.isUsageLoading,
             usageErrorMessage = usageData.usageErrorMessage,
             sevenDayChartState = usageData.sevenDayChartState,
-            monitoredApps = usageData.monitoredApps,
+            monitoredApps = annotatedApps,
             totalDailyLimitMs = usageData.totalDailyLimitMs
         )
     }.stateIn(
@@ -166,6 +188,7 @@ class MainViewModel(
                 val todayUsageMap = usageRepo.getTodayUsageForPackages(selectedPackages).getOrDefault(emptyMap())
                 val cumulativeUsageMap = usageRepo.getMultiDayUsageForPackages(selectedPackages, 7).getOrDefault(emptyMap())
                 val recordedDays = if (chartState is SevenDayChartState.Success) chartState.recordedDayCount else 7
+                val activeCommitment = commitmentLockRepository?.commitmentState?.value ?: CommitmentLockState()
 
                 selectedPackages.map { pkg ->
                     val app = discoveredMap[pkg]
@@ -177,7 +200,9 @@ class MainViewModel(
                         todayUsageMs = todayUsageMap[pkg] ?: 0L,
                         dailyLimitMs = limitMs,
                         cumulativeUsageMs = maxOf(cumulativeUsageMap[pkg] ?: 0L, todayUsageMap[pkg] ?: 0L),
-                        observationDays = recordedDays
+                        observationDays = recordedDays,
+                        pendingMidnightRemoval = activeCommitment.pendingRemovedPackages.contains(pkg),
+                        pendingMidnightLimitMs = activeCommitment.pendingIncreasedLimits[pkg]
                     )
                 }.sortedByDescending { it.todayUsageMs }
             } else {

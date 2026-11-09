@@ -103,16 +103,19 @@ Entry & Gating Flow:
      - Row details: App icon, app label, today's usage (e.g., "45 min"), and cumulative usage annotated with the actual available timeframe (e.g., "4h 15m (7d)" or "1h 30m (3d of data)").
      - Visual progress bar showing consumption relative to limit (if configured) or relative to total device time.
      - Status badges: `Within limit`, `Nearing limit (>80%)`, `Limit reached`, or `Unrestricted`.
+     - Staged relaxation badges: Warning badges for apps scheduled for removal at midnight ("Removal at midnight") or limit increase ("New limit: X at midnight").
+     - Clean motivational empty state with direct "Choose Apps to Control" button when no apps are selected.
   6. **Quick Configuration CTA**:
-     - Floating or inline button: "Configure Limits & Apps" -> navigates directly to Limits tab.
+     - Inline button: "Configure Limits & Add Apps" -> navigates directly to Limits tab.
 
 ### 3.4 Guided Protection Setup (Contextual & Non-Blocking Post-Home)
 - Contextual checklist embedded on Home dashboard for completing protection:
-  1. *Step 1: App Selection* -> Choose distracting apps to control.
-  2. *Step 2: Daily Limits* -> Set intentional daily allowances.
-  3. *Step 3: Accessibility Detection* -> Transparent disclosure and service enablement for real-time blocking.
+  1. *Step 1: App Selection* -> Choose distracting apps to control (Status badge, description, and "Choose Apps" CTA button).
+  2. *Step 2: Daily Limits* -> Set intentional daily allowances (Status badge, description, and "Set Limits" CTA button).
+  3. *Step 3: Accessibility Detection* -> Transparent disclosure and service enablement for real-time blocking (Status badge, description, and "Enable Service" CTA button).
   4. *Step 4: Active Protection* -> Verification that limits and accessibility are active.
 - Non-blocking: Users can explore the dashboard and available historical stats immediately because Usage Access is already granted.
+- Automatically collapses/hides when all steps are completed and protection is active.
 
 ### 3.5 Limits & App Management Screen
 - **Purpose**: Search, select, and configure daily allowances for distracting applications.

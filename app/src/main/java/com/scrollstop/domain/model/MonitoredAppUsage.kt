@@ -18,10 +18,13 @@ data class MonitoredAppUsage(
     val todayUsageMs: Long = 0L,
     val dailyLimitMs: Long? = null,
     val cumulativeUsageMs: Long = 0L,
-    val observationDays: Int = 0
+    val observationDays: Int = 0,
+    val pendingMidnightRemoval: Boolean = false,
+    val pendingMidnightLimitMs: Long? = null
 ) {
     val formattedTodayUsage: String = formatDuration(todayUsageMs)
     val formattedLimit: String = dailyLimitMs?.let { "${formatDuration(it)} daily" } ?: "No limit"
+    val formattedPendingMidnightLimit: String? = pendingMidnightLimitMs?.let { "${formatDuration(it)} daily" }
     val formattedCumulative: String = if (observationDays >= 7) {
         "${formatDuration(cumulativeUsageMs)} (7d)"
     } else if (observationDays > 0) {
