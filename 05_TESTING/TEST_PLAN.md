@@ -204,12 +204,17 @@
 13. **Navigation Returning User With Permission**: User who finished Welcome and granted Usage Access bypasses gates directly to `Screen.Main` (Home dashboard).
 14. **Navigation Guest Transition**: Tapping "Continue as Guest" immediately transitions to `Screen.UsageAccessGate` if permission is missing.
 15. **Navigation Get Started Transition**: Tapping "Get Started" immediately transitions to `Screen.UsageAccessGate` if permission is missing.
-16. **Gate Back Navigation (First-Time Onboarding)**: Pressing back from Usage Access Gate during first-time onboarding returns to Welcome screen and resets welcome completion.
-17. **Gate Back Navigation (Returning User Revocation)**: Gate BackHandler is disabled for returning users whose permission was revoked, allowing default system back/minimize behavior without trapping the user or routing to Welcome/Home.
-18. **Recheck Permission (Missing)**: Recheck action with missing permission displays guidance banner and remains on gate.
-19. **Recheck Permission (Granted)**: Recheck action with granted permission routes immediately to Main dashboard without showing guidance banner.
-20. **Lifecycle ON_RESUME Auto-Routing**: Returning to app with granted permission automatically routes from gate to Main dashboard.
-21. **Lifecycle ON_RESUME Revocation Redirect**: Background revocation of Usage Access immediately redirects from Main dashboard back to mandatory gate.
+16. **Gate Visible Top Bar & Back Chevron**: Renders persistent `ScrollStopTopBar` with accessible back chevron (`contentDescription = "Navigate back"`, $\ge 48\text{dp}$ touch target).
+17. **Gate Back Navigation (First-Time Onboarding - System Back)**: Pressing physical/system Back from Usage Access Gate during first-time onboarding returns to Welcome screen and resets welcome completion.
+18. **Gate Back Navigation (First-Time Onboarding - Visible Back)**: Tapping visible back arrow from Usage Access Gate during first-time onboarding returns to Welcome screen and resets welcome completion.
+19. **Gate Back Navigation (First-Time Onboarding - Return from Settings)**: Returning from Android Settings without granting permission preserves the Welcome origin, allowing the user to navigate back to Welcome.
+20. **Gate Back Navigation (Returning User Revocation - System Back)**: Pressing system Back for a returning user with revoked permission cleanly finishes the activity (`activity.finish()`), minimizing/exiting the app.
+21. **Gate Back Navigation (Returning User Revocation - Visible Back)**: Tapping visible back arrow for a returning user with revoked permission cleanly finishes the activity (`activity.finish()`), minimizing/exiting the app.
+22. **Gate Back Security Invariant**: Neither back mechanism can navigate to Home without verified platform Usage Access.
+23. **Recheck Permission (Missing)**: Recheck action with missing permission displays guidance banner and remains on gate.
+24. **Recheck Permission (Granted)**: Recheck action with granted permission routes immediately to Main dashboard without showing guidance banner.
+25. **Lifecycle ON_RESUME Auto-Routing**: Returning to app with granted permission automatically routes from gate to Main dashboard.
+26. **Lifecycle ON_RESUME Revocation Redirect**: Background revocation of Usage Access immediately redirects from Main dashboard back to mandatory gate.
 
 ### Daily Midnight Reset Regression Test Suite (MidnightResetRegressionTest)
 

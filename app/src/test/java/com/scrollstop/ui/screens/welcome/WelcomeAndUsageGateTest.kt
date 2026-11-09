@@ -138,6 +138,7 @@ class WelcomeAndUsageGateTest {
             }
         }
 
+        composeTestRule.onNodeWithContentDescription("Navigate back").assertIsDisplayed()
         composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
         composeTestRule.onNodeWithText("Real limits require\naccurate measurement.").assertIsDisplayed()
         composeTestRule.onNodeWithText("Why It's Needed").performScrollTo().assertIsDisplayed()
@@ -146,6 +147,24 @@ class WelcomeAndUsageGateTest {
         composeTestRule.onNodeWithText("Separate from Accessibility").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Grant Usage Access").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Recheck Permission").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun usageAccessGateScreen_clickingNavigateBack_invokesBackCallback() {
+        var backClicked = false
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                UsageAccessGateScreen(
+                    onOpenSettings = {},
+                    onRecheckPermission = { false },
+                    onNavigateBack = { backClicked = true }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Navigate back").assertIsDisplayed().performClick()
+        assertTrue("onNavigateBack must be invoked when back arrow is clicked", backClicked)
     }
 
     @Test
@@ -366,7 +385,71 @@ class WelcomeAndUsageGateTest {
     }
 
     @Test
-    fun backPress_fromUsageGate_afterPermissionRevocation_doesNotRouteToWelcomeOrHome() {
+    fun visibleBackClick_fromUsageGate_duringFirstTimeOnboarding_returnsToWelcome() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.resetForTesting()
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        // Click Get Started on Welcome
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+        assertTrue(onboardingRepository.hasCompletedWelcome())
+
+        // Tap visible back arrow from Usage Gate
+        composeTestRule.onNodeWithContentDescription("Navigate back").performClick()
+
+        // Must return to Welcome and reset welcome completion
+        composeTestRule.onNodeWithText("STOP DOOM SCROLL").assertIsDisplayed()
+        assertFalse(onboardingRepository.hasCompletedWelcome())
+    }
+
+    @Test
+    fun firstTimeUser_returnsFromSettingsWithoutPermission_canStillNavigateBackToWelcome() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.resetForTesting()
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        // Click Get Started on Welcome
+        composeTestRule.onNodeWithText("Get Started").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+
+        // Simulate returning from Android Settings without permission (ON_RESUME)
+        composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        composeTestRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+
+        // Still on gate
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+
+        // Tap visible back arrow
+        composeTestRule.onNodeWithContentDescription("Navigate back").performClick()
+
+        // Must return to Welcome and reset welcome completion
+        composeTestRule.onNodeWithText("STOP DOOM SCROLL").assertIsDisplayed()
+        assertFalse(onboardingRepository.hasCompletedWelcome())
+    }
+
+    @Test
+    fun backPress_fromUsageGate_afterPermissionRevocation_finishesActivity() {
         Shadows.shadowOf(appOpsManager).setMode(
             AppOpsManager.OPSTR_GET_USAGE_STATS,
             Process.myUid(),
@@ -383,16 +466,36 @@ class WelcomeAndUsageGateTest {
 
         composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
 
-        // For returning user with revoked permission, gate BackHandler must be disabled
-        assertFalse(
-            "BackHandler must not be enabled when gate did not originate from Welcome",
-            composeTestRule.activity.onBackPressedDispatcher.hasEnabledCallbacks()
-        )
-
-        // Calling back press must not route to Welcome or Main
+        // Calling system back press must finish the activity
         composeTestRule.activity.onBackPressedDispatcher.onBackPressed()
+        assertTrue("Activity must finish when returning user presses system back on gate", composeTestRule.activity.isFinishing)
+        // Home must never be displayed without permission
+        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertDoesNotExist()
+    }
+
+    @Test
+    fun visibleBackClick_fromUsageGate_afterPermissionRevocation_finishesActivity() {
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED
+        )
+        onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
         composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
-        assertTrue(onboardingRepository.hasCompletedWelcome())
+
+        // Clicking visible back arrow must finish the activity
+        composeTestRule.onNodeWithContentDescription("Navigate back").performClick()
+        assertTrue("Activity must finish when returning user taps visible back on gate", composeTestRule.activity.isFinishing)
+        // Home must never be displayed without permission
+        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertDoesNotExist()
     }
 
     @Test

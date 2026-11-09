@@ -1,14 +1,14 @@
 # Project Status
 
-**Date:** 2026-11-08\
-**Stage:** Phase 1: Welcome Screen & Mandatory Usage Access Gate — Defect A & B Resolved (369 AUTOMATED TESTS PASS)
+**Date:** 2026-11-09\
+**Stage:** Phase 1: Welcome Screen & Mandatory Usage Access Gate — Final Back Navigation Fixed (373 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
-- **Stop Doom Scroll — Phase 1: Welcome Screen & Mandatory Usage Access Gate (Defects A & B Resolved)**: PASS
+- **Stop Doom Scroll — Phase 1: Welcome Screen & Mandatory Usage Access Gate (Final Back Navigation Resolved)**: PASS
   - **Implementation Delivered**:
     1. **Welcome Screen (`WelcomeScreen.kt`)**:
        - Designed and built with the approved Bold Modern visual direction, Balanced layout density, Motivational personality, Slate/Emerald color tokens, and full Light & Dark mode support.
@@ -21,18 +21,20 @@
          * *Powers Your Dashboard*: Powers daily limits, remaining time calculations, and 7-day usage trends.
          * *100% Local-First Privacy*: On-device processing with zero cloud sync.
          * *Separate from Accessibility*: Usage Access is for time tracking; Accessibility is for blocking enforcement.
+       - **Visible Back Button**: Integrated `ScrollStopTopBar` featuring an accessible back chevron (`contentDescription = "Navigate back"`, minimum 48x48dp touch target) in both Light and Dark themes.
        - Action controls: Primary "Grant Usage Access" (launches Android system `ACTION_USAGE_ACCESS_SETTINGS`) and secondary "Recheck Permission" (evaluates runtime status).
-       - **Defect B Resolution**: Removed inner redundant `LifecycleEventObserver` from `UsageAccessGateScreen` to ensure `AppNavigation` remains the single authoritative lifecycle observer. Updated `onRecheckPermission: () -> Boolean` to query runtime platform status synchronously; if granted, navigates to Home immediately; if not, triggers the warning guidance banner. Eliminated stale boolean parameters.
        - Strict gate enforcement: No skip, dismiss, or bypass actions.
-    3. **Navigation Integration (`AppNavigation.kt`)**:
-       - `Screen.Welcome` and `Screen.UsageAccessGate` added to the navigation hierarchy.
-       - Entry routing evaluates `onboardingRepository.hasCompletedWelcome()` and `usageStatsRepository.hasUsagePermission()`.
-       - Users cannot reach `Screen.Main` (Home dashboard) without verified Usage Access.
-       - **Defect A Resolution**: Added `gateEnteredFromWelcome` origin tracking. For first-time onboarding from Welcome, device Back safely returns to Welcome and resets welcome completion. For returning users whose permission was revoked or missing, gate `BackHandler` is inactive (`enabled = false`), allowing Android system back/minimize behavior without trapping the user and without bypassing to Home.
-       - Dynamic `ON_RESUME` re-verification: If a user revokes Usage Access in Android Settings while the app is in the background, returning to the app immediately routes back to `Screen.UsageAccessGate`.
+    3. **Navigation & Back Dispatch Integration (`AppNavigation.kt` & `AndroidManifest.xml`)**:
+       - `Screen.Welcome` and `Screen.UsageAccessGate` integrated in navigation hierarchy.
+       - **Final Back Navigation Fix**:
+         * Replaced `remember` with `rememberSaveable` for `gateEnteredFromWelcome` to survive activity recreation and configuration changes.
+         * Fixed `ON_RESUME` condition so returning from Android Settings without permission preserves `gateEnteredFromWelcome == true` rather than wiping it.
+         * Resolved Activity resolution defect: Resolved Activity via `Context.findActivity()` instead of failing on `applicationContext as? Activity`.
+         * Configured unified `handleGateBack`: For first-time onboarding, safely returns to Welcome and resets `setWelcomeCompleted(false)`. For returning users with revoked permission, cleanly calls `activity.finish()`, exiting/minimizing the app.
+         * Added `android:enableOnBackInvokedCallback="true"` to `<application>` in `AndroidManifest.xml` for Android 13+ predictive back gesture dispatch.
     4. **Automated Verification**:
-       - Comprehensive test suite `WelcomeAndUsageGateTest.kt` expanded to 21 test cases (Light/Dark themes, Guest and Get Started flows, education cards, grant and recheck callbacks, guidance banner, repository defaults and persistence, Defect A back navigation during first onboarding, Defect A back navigation after revocation, Defect B recheck when missing, Defect B recheck when granted, Defect B lifecycle ON_RESUME auto-routing to Main, and Defect B lifecycle ON_RESUME revocation redirect).
-       - Full unit test suite passes: **369 tests passed, 0 failures**.
+       - Comprehensive test suite `WelcomeAndUsageGateTest.kt` expanded to 25 test cases covering all visible Back and system Back scenarios for both onboarding and returning users, settings returns, recheck actions, and lifecycle state changes.
+       - Full unit test suite passes.
        - Both `assembleDebug` builds successfully with zero errors.
 - **Stop Doom Scroll — Critical Usage Calculation Audit Resolved**: PASS
   - **Reproduction & Symptom**:

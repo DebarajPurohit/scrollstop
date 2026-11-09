@@ -29,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.scrollstop.ui.components.ScrollStopTopBar
 import com.scrollstop.ui.theme.StopDoomScrollTheme
 import com.scrollstop.ui.theme.ThemeMode
 
@@ -75,19 +77,29 @@ import com.scrollstop.ui.theme.ThemeMode
 fun UsageAccessGateScreen(
     onOpenSettings: () -> Unit,
     onRecheckPermission: () -> Boolean,
+    onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var hasAttemptedGrant by remember { mutableStateOf(false) }
 
-    Surface(
-        modifier = modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    Scaffold(
+        topBar = {
+            ScrollStopTopBar(
+                title = "",
+                onNavigateBack = onNavigateBack,
+                containerColor = MaterialTheme.colorScheme.background,
+                titleContentColor = MaterialTheme.colorScheme.onBackground
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background,
+        modifier = modifier.fillMaxSize()
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
@@ -95,8 +107,6 @@ fun UsageAccessGateScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-
                 // Hero Gate Emblem (Data Shield in Emerald)
                 GateShieldBadge()
 
@@ -412,6 +422,7 @@ fun UsageAccessGateScreen(
     onOpenSettings: () -> Unit,
     onRecheckPermission: () -> Unit,
     onPermissionGranted: () -> Unit,
+    onNavigateBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     UsageAccessGateScreen(
@@ -425,6 +436,7 @@ fun UsageAccessGateScreen(
                 false
             }
         },
+        onNavigateBack = onNavigateBack,
         modifier = modifier
     )
 }
@@ -435,7 +447,8 @@ private fun UsageAccessGateScreenLightPreview() {
     StopDoomScrollTheme(themeMode = ThemeMode.LIGHT) {
         UsageAccessGateScreen(
             onOpenSettings = {},
-            onRecheckPermission = { false }
+            onRecheckPermission = { false },
+            onNavigateBack = {}
         )
     }
 }
@@ -446,7 +459,8 @@ private fun UsageAccessGateScreenDarkPreview() {
     StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
         UsageAccessGateScreen(
             onOpenSettings = {},
-            onRecheckPermission = { false }
+            onRecheckPermission = { false },
+            onNavigateBack = {}
         )
     }
 }

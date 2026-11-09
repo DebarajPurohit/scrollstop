@@ -71,9 +71,11 @@ Entry & Gating Flow:
      - Authoritative verification via `AppNavigation` lifecycle `ON_RESUME` when the user navigates back from system Settings.
      - If verified: Automatically routes forward to the **Home Dashboard**.
      - If not verified: Remains on screen and displays guidance: "Permission not detected yet. In Android Settings, find Stop Doom Scroll in the list and toggle 'Permit usage access' on."
-  6. **Back Navigation Guard**:
-     - First-time onboarding: Back button safely returns user to the Welcome screen and resets welcome completion.
-     - Returning / revoked user: `BackHandler` is inactive (`enabled = false`), allowing default Android system exit/minimize behavior without trapping the user and without bypassing to Home.
+  6. **Back Navigation & Visible Top Bar**:
+     - Visible top navigation bar: Features `ScrollStopTopBar` with accessible back chevron (`contentDescription = "Navigate back"`, minimum 48x48dp touch target).
+     - First-time onboarding: Tapping visible back arrow or pressing Android system Back returns safely to Welcome and resets `setWelcomeCompleted(false)`. Origin tracking is retained across Android Settings returns and configuration changes.
+     - Returning / revoked user: Tapping visible back arrow or pressing Android system Back invokes `activity.finish()`, cleanly exiting/minimizing the app without trapping the user and without bypassing to Home.
+     - Android 13+ Predictive Back: `android:enableOnBackInvokedCallback="true"` enabled in `AndroidManifest.xml` ensuring consistent system gesture dispatch.
 
 ### 3.3 Home Dashboard Screen (First Main Screen Post-Permission)
 - **Purpose**: Central command center providing instant visibility into device screen time, monitored app consumption, and enforcement status.

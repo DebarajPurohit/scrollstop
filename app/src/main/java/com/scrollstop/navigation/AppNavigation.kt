@@ -1,5 +1,8 @@
 package com.scrollstop.navigation
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -8,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -56,7 +60,8 @@ fun AppNavigation(
     initialBlockedPackage: String? = null,
     onClearBlockedPackage: () -> Unit = {}
 ) {
-    val context = LocalContext.current.applicationContext
+    val localContext = LocalContext.current
+    val context = localContext.applicationContext
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val onboardingRepository = remember(context) {
@@ -100,7 +105,7 @@ fun AppNavigation(
     }
     var currentScreen by remember { mutableStateOf<Screen>(initialScreen) }
     var previousScreen by remember { mutableStateOf<Screen>(initialScreen) }
-    var gateEnteredFromWelcome by remember { mutableStateOf(false) }
+    var gateEnteredFromWelcome by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
 
     val mainViewModel = remember(
@@ -150,7 +155,7 @@ fun AppNavigation(
                 if (currentScreen is Screen.UsageAccessGate && hasPermission) {
                     gateEnteredFromWelcome = false
                     currentScreen = Screen.Main
-                } else if (onboardingRepository.hasCompletedWelcome() && !hasPermission && currentScreen !is Screen.Blocking) {
+                } else if (onboardingRepository.hasCompletedWelcome() && !hasPermission && currentScreen !is Screen.Blocking && currentScreen !is Screen.UsageAccessGate && currentScreen !is Screen.Welcome) {
                     // Usage Access was revoked while app was backgrounded: route directly to mandatory gate
                     gateEnteredFromWelcome = false
                     currentScreen = Screen.UsageAccessGate
@@ -218,11 +223,19 @@ fun AppNavigation(
             )
         }
         is Screen.UsageAccessGate -> {
-            BackHandler(enabled = gateEnteredFromWelcome) {
-                onboardingRepository.setWelcomeCompleted(false)
-                gateEnteredFromWelcome = false
-                currentScreen = Screen.Welcome
+            val handleGateBack: () -> Unit = {
+                if (gateEnteredFromWelcome) {
+                    onboardingRepository.setWelcomeCompleted(false)
+                    gateEnteredFromWelcome = false
+                    currentScreen = Screen.Welcome
+                } else {
+                    val activity = localContext.findActivity()
+                    activity?.finish()
+                }
             }
+
+            BackHandler(onBack = handleGateBack)
+
             UsageAccessGateScreen(
                 onOpenSettings = {
                     mainViewModel.openUsageAccessSettings(context)
@@ -234,7 +247,8 @@ fun AppNavigation(
                         currentScreen = Screen.Main
                     }
                     granted
-                }
+                },
+                onNavigateBack = handleGateBack
             )
         }
         is Screen.Main -> {
@@ -432,4 +446,13 @@ fun AppNavigation(
             onDismiss = { showThemeDialog = false }
         )
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
 }
