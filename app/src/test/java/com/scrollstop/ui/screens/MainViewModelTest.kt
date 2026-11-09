@@ -11,6 +11,7 @@ import com.scrollstop.data.repository.UsageStatsRepository
 import com.scrollstop.domain.model.AccessibilityServiceState
 import com.scrollstop.domain.model.DailyUsageRecord
 import com.scrollstop.domain.model.DiscoveredApp
+import com.scrollstop.domain.model.MonitoredAppUsage
 import com.scrollstop.domain.model.ProtectionHealthState
 import com.scrollstop.ui.components.SevenDayChartState
 import kotlinx.coroutines.Dispatchers
@@ -268,6 +269,59 @@ class MainViewModelTest {
 
         // Total daily limit summed
         assertEquals(5_400_000L, state.totalDailyLimitMs)
+    }
+
+    @Test
+    fun mainUiState_protectionSetupPredicates_evaluateAuthoritatively() {
+        // Step 1: Apps selected
+        assertFalse(MainUiState(selectedAppCount = 0).isStep1AppsSelected)
+        assertTrue(MainUiState(selectedAppCount = 1).isStep1AppsSelected)
+
+        // Step 2 & enforcedAppCount: Limits configured
+        val appsWithNoLimits = listOf(
+            MonitoredAppUsage(packageName = "app1", appName = "App1", dailyLimitMs = null),
+            MonitoredAppUsage(packageName = "app2", appName = "App2", dailyLimitMs = 0L)
+        )
+        val stateNoLimits = MainUiState(monitoredApps = appsWithNoLimits)
+        assertEquals(0, stateNoLimits.enforcedAppCount)
+        assertFalse(stateNoLimits.isStep2LimitsConfigured)
+
+        val appsWithLimits = listOf(
+            MonitoredAppUsage(packageName = "app1", appName = "App1", dailyLimitMs = 1800000L),
+            MonitoredAppUsage(packageName = "app2", appName = "App2", dailyLimitMs = null)
+        )
+        val stateWithLimits = MainUiState(monitoredApps = appsWithLimits)
+        assertEquals(1, stateWithLimits.enforcedAppCount)
+        assertTrue(stateWithLimits.isStep2LimitsConfigured)
+
+        // Step 3: Accessibility active only when PROTECTED
+        assertTrue(MainUiState(healthState = ProtectionHealthState.PROTECTED).isStep3AccessibilityActive)
+        assertFalse(MainUiState(healthState = ProtectionHealthState.USAGE_ACCESS_REQUIRED).isStep3AccessibilityActive)
+        assertFalse(MainUiState(healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED).isStep3AccessibilityActive)
+        assertFalse(MainUiState(healthState = ProtectionHealthState.ACCESSIBILITY_INTERRUPTED).isStep3AccessibilityActive)
+        assertFalse(MainUiState(healthState = ProtectionHealthState.DEGRADED).isStep3AccessibilityActive)
+
+        // Setup complete requires all 3 steps
+        val incompleteState1 = MainUiState(
+            selectedAppCount = 1,
+            monitoredApps = appsWithNoLimits,
+            healthState = ProtectionHealthState.PROTECTED
+        )
+        assertFalse(incompleteState1.isSetupComplete)
+
+        val incompleteState2 = MainUiState(
+            selectedAppCount = 1,
+            monitoredApps = appsWithLimits,
+            healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED
+        )
+        assertFalse(incompleteState2.isSetupComplete)
+
+        val completeState = MainUiState(
+            selectedAppCount = 1,
+            monitoredApps = appsWithLimits,
+            healthState = ProtectionHealthState.PROTECTED
+        )
+        assertTrue(completeState.isSetupComplete)
     }
 
     private class FakeProtectionHealthRepository : ProtectionHealthRepository {

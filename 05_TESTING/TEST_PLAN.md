@@ -249,6 +249,20 @@
 14. **Commitment Lock Card - Staged Midnight Relaxations**: Renders dedicated pending changes container displaying all staged app removals and limit increases taking effect at midnight.
 15. **Theme Engine & Appearance**: Supports Light, Dark, and System Default themes without hardcoded hex colors, with dialog theme switcher in TopBar.
 
+### Phase 2 Protection Status & Accessibility Completion Logic Audit Test Suite
+
+1. **Guided Setup Accessibility Predicate (`isStep3AccessibilityActive`)**:
+   - Evaluates authoritatively to `true` ONLY when `healthState == ProtectionHealthState.PROTECTED`.
+   - Explicitly evaluates to `false` for `USAGE_ACCESS_REQUIRED`, preventing false-positive completion checkmarks during onboarding or permission revocation.
+   - Evaluates to `false` for `ACCESSIBILITY_REQUIRED`, `ACCESSIBILITY_INTERRUPTED`, and `DEGRADED`.
+2. **Protection Status Accuracy - Selected Apps Without Configured Limits**:
+   - When applications are selected but have no configured daily limits (`dailyLimitMs == null` or `0`), the dashboard must NOT claim `PROTECTION ACTIVE`.
+   - Displays `SETUP REQUIRED` state with clear description: "Configure daily limits for your selected apps to enable protection." and direct "Configure Limits" CTA button.
+3. **Monitored App Count Reflects Enforced Apps Only**:
+   - Protection banner displays active limit count (`enforcedAppCount`) instead of simple selected app count (e.g. 3 apps selected but only 1 with configured limit displays "Enforcing daily limits for 1 selected apps.").
+4. **Setup Completion Predicate (`isSetupComplete`)**:
+   - Evaluates to `true` if and only if: `isStep1AppsSelected` (`selectedAppCount > 0`), `isStep2LimitsConfigured` (`enforcedAppCount > 0`), and `isStep3AccessibilityActive` (`healthState == PROTECTED`).
+
 ## Critical Enforcement
 
 -   Limit reached while app is open

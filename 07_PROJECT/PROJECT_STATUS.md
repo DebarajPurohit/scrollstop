@@ -1,13 +1,24 @@
 # Project Status
 
 **Date:** 2026-11-09\
-**Stage:** Phase 2: Home Dashboard & Guided Protection Setup Implementation Complete (381 AUTOMATED TESTS PASS)
+**Stage:** Phase 2: Home Dashboard, Guided Setup & Protection Logic Audit Complete (385 AUTOMATED TESTS PASS)
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Phase 2: Protection Status Logic Audit & Corrections**: PASS
+  - **Issue A: Guided Setup Accessibility Completion**: Corrected predicate `isStep3AccessibilityActive` to check `healthState == ProtectionHealthState.PROTECTED`. Eliminated false-positive checkmark when `healthState == USAGE_ACCESS_REQUIRED`, `ACCESSIBILITY_REQUIRED`, `ACCESSIBILITY_INTERRUPTED`, or `DEGRADED`.
+  - **Issue B: Protection Status Accuracy**: Corrected `ProtectionStatusCard` and `MainUiState`:
+    - Enforced app count (`enforcedAppCount`) counts only applications with configured, positive daily limits (`dailyLimitMs != null && dailyLimitMs > 0`).
+    - Dashboard claims `PROTECTION ACTIVE` if and only if `healthState == PROTECTED && enforcedAppCount > 0`.
+    - If apps are selected but 0 limits are configured, card displays `SETUP REQUIRED` with description "Configure daily limits for your selected apps to enable protection." and a direct "Configure Limits" CTA button.
+    - Protection active banner accurately displays enforced app count: "Enforcing daily limits for %d selected apps.".
+  - **Verification**:
+    - 385 passing unit tests (0 failures, 0 skipped).
+    - `assembleDebug` and `assembleRelease` compile cleanly.
+    - Core rules engine and service enforcement 100% untouched.
 - **Stop Doom Scroll — Phase 2: Home Dashboard & Guided Protection Setup Implementation**: PASS
   - **Implementation Delivered**:
     1. **Approved Design Language & Theme System**:

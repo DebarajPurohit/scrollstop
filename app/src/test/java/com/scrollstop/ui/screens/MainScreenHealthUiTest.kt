@@ -34,12 +34,18 @@ class MainScreenHealthUiTest {
 
     @Test
     fun mainScreen_protectedState_rendersActiveBanner() {
+        val apps = listOf(
+            MonitoredAppUsage(packageName = "com.example.app1", appName = "App 1", todayUsageMs = 1000L, dailyLimitMs = 1800000L),
+            MonitoredAppUsage(packageName = "com.example.app2", appName = "App 2", todayUsageMs = 1000L, dailyLimitMs = 1800000L),
+            MonitoredAppUsage(packageName = "com.example.app3", appName = "App 3", todayUsageMs = 1000L, dailyLimitMs = 1800000L)
+        )
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 MainScreen(
                     uiState = MainUiState(
                         healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 3
+                        selectedAppCount = 3,
+                        monitoredApps = apps
                     )
                 )
             }
@@ -47,6 +53,84 @@ class MainScreenHealthUiTest {
 
         composeTestRule.onNodeWithText("PROTECTION ACTIVE").assertIsDisplayed()
         composeTestRule.onNodeWithText("Enforcing daily limits for 3 selected apps.").assertIsDisplayed()
+    }
+
+    @Test
+    fun mainScreen_isStep3AccessibilityActive_evaluatesEveryHealthState() {
+        // Accessibility is complete ONLY when healthState confirms the service is active (PROTECTED)
+        assertTrue(
+            MainUiState(healthState = ProtectionHealthState.PROTECTED).isStep3AccessibilityActive
+        )
+        // USAGE_ACCESS_REQUIRED must never count as Accessibility completion
+        org.junit.Assert.assertFalse(
+            MainUiState(healthState = ProtectionHealthState.USAGE_ACCESS_REQUIRED).isStep3AccessibilityActive
+        )
+        // ACCESSIBILITY_REQUIRED, ACCESSIBILITY_INTERRUPTED and DEGRADED must remain incomplete
+        org.junit.Assert.assertFalse(
+            MainUiState(healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED).isStep3AccessibilityActive
+        )
+        org.junit.Assert.assertFalse(
+            MainUiState(healthState = ProtectionHealthState.ACCESSIBILITY_INTERRUPTED).isStep3AccessibilityActive
+        )
+        org.junit.Assert.assertFalse(
+            MainUiState(healthState = ProtectionHealthState.DEGRADED).isStep3AccessibilityActive
+        )
+    }
+
+    @Test
+    fun mainScreen_selectedAppsWithoutLimits_doesNotShowProtected() {
+        var configureLimitsClicked = false
+        val appsWithoutLimits = listOf(
+            MonitoredAppUsage(packageName = "com.example.app1", appName = "App 1", todayUsageMs = 1000L, dailyLimitMs = null),
+            MonitoredAppUsage(packageName = "com.example.app2", appName = "App 2", todayUsageMs = 2000L, dailyLimitMs = 0L)
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 2,
+                        monitoredApps = appsWithoutLimits
+                    ),
+                    onNavigateToLimits = { configureLimitsClicked = true }
+                )
+            }
+        }
+
+        // Must NOT show PROTECTION ACTIVE
+        composeTestRule.onNode(hasText("PROTECTION ACTIVE")).assertDoesNotExist()
+        // Must show SETUP REQUIRED
+        composeTestRule.onNodeWithText("SETUP REQUIRED").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Configure daily limits for your selected apps to enable protection.").assertIsDisplayed()
+        // Must show Configure Limits CTA and trigger navigation
+        composeTestRule.onNodeWithContentDescription("Configure Limits Setup Button").performClick()
+        assertTrue(configureLimitsClicked)
+    }
+
+    @Test
+    fun mainScreen_monitoredAppCount_reflectsEnforcedAppsOnly() {
+        val mixedApps = listOf(
+            MonitoredAppUsage(packageName = "com.example.app1", appName = "App 1", todayUsageMs = 1000L, dailyLimitMs = 1800000L),
+            MonitoredAppUsage(packageName = "com.example.app2", appName = "App 2", todayUsageMs = 2000L, dailyLimitMs = null),
+            MonitoredAppUsage(packageName = "com.example.app3", appName = "App 3", todayUsageMs = 500L, dailyLimitMs = 0L)
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 3,
+                        monitoredApps = mixedApps
+                    )
+                )
+            }
+        }
+
+        // Selected app count is 3, but enforced count is 1. Banner must reflect enforced app count (1)
+        composeTestRule.onNodeWithText("PROTECTION ACTIVE").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enforcing daily limits for 1 selected apps.").assertIsDisplayed()
     }
 
     @Test

@@ -295,9 +295,11 @@ fun MainScreen(
                 ProtectionStatusCard(
                     healthState = uiState.healthState,
                     selectedAppCount = uiState.selectedAppCount,
+                    enforcedAppCount = uiState.enforcedAppCount,
                     onGrantUsageAccess = onGrantUsageAccess,
                     onEnableAccessibility = onEnableAccessibility,
-                    onNavigateToAppSelection = onNavigateToAppSelection
+                    onNavigateToAppSelection = onNavigateToAppSelection,
+                    onNavigateToLimits = onNavigateToLimits
                 )
 
                 // =============================================================
@@ -989,12 +991,14 @@ private fun AppUsageRowItem(
 private fun ProtectionStatusCard(
     healthState: ProtectionHealthState,
     selectedAppCount: Int,
+    enforcedAppCount: Int,
     onGrantUsageAccess: () -> Unit,
     onEnableAccessibility: () -> Unit,
-    onNavigateToAppSelection: () -> Unit
+    onNavigateToAppSelection: () -> Unit,
+    onNavigateToLimits: () -> Unit
 ) {
-    val isProtected = healthState == ProtectionHealthState.PROTECTED && selectedAppCount > 0
-    val isSetupRequired = (healthState == ProtectionHealthState.PROTECTED && selectedAppCount == 0) ||
+    val isProtected = healthState == ProtectionHealthState.PROTECTED && enforcedAppCount > 0
+    val isSetupRequired = (healthState == ProtectionHealthState.PROTECTED && enforcedAppCount == 0) ||
         healthState == ProtectionHealthState.DEGRADED
 
     val borderColor = when {
@@ -1078,11 +1082,11 @@ private fun ProtectionStatusCard(
 
             Text(
                 text = when {
-                    isProtected -> stringResource(R.string.health_desc_protected, selectedAppCount)
-                    isSetupRequired -> if (selectedAppCount == 0) {
-                        "Choose distracting apps to control and configure daily limits."
-                    } else {
-                        stringResource(R.string.health_desc_degraded)
+                    isProtected -> stringResource(R.string.health_desc_protected, enforcedAppCount)
+                    isSetupRequired -> when {
+                        selectedAppCount == 0 -> "Choose distracting apps to control and configure daily limits."
+                        healthState == ProtectionHealthState.PROTECTED && enforcedAppCount == 0 -> "Configure daily limits for your selected apps to enable protection."
+                        else -> stringResource(R.string.health_desc_degraded)
                     }
                     healthState == ProtectionHealthState.USAGE_ACCESS_REQUIRED -> stringResource(R.string.health_desc_usage_required)
                     healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> stringResource(R.string.health_desc_accessibility_required)
@@ -1109,6 +1113,22 @@ private fun ProtectionStatusCard(
                         ) {
                             Text(
                                 text = stringResource(R.string.btn_choose_apps),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    isSetupRequired && healthState == ProtectionHealthState.PROTECTED && enforcedAppCount == 0 -> {
+                        Button(
+                            onClick = onNavigateToLimits,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .semantics {
+                                    contentDescription = "Configure Limits Setup Button"
+                                }
+                        ) {
+                            Text(
+                                text = "Configure Limits",
                                 fontWeight = FontWeight.Bold
                             )
                         }

@@ -48,18 +48,17 @@ data class MainUiState(
     val isStep1AppsSelected: Boolean
         get() = selectedAppCount > 0
 
+    val enforcedAppCount: Int
+        get() = monitoredApps.count { it.dailyLimitMs != null && it.dailyLimitMs > 0 }
+
     val isStep2LimitsConfigured: Boolean
-        get() = monitoredApps.isNotEmpty() && monitoredApps.any { it.dailyLimitMs != null }
+        get() = monitoredApps.isNotEmpty() && enforcedAppCount > 0
 
     val isStep3AccessibilityActive: Boolean
-        get() = healthState !in listOf(
-            ProtectionHealthState.ACCESSIBILITY_REQUIRED,
-            ProtectionHealthState.ACCESSIBILITY_INTERRUPTED,
-            ProtectionHealthState.DEGRADED
-        )
+        get() = healthState == ProtectionHealthState.PROTECTED
 
     val isSetupComplete: Boolean
-        get() = isStep1AppsSelected && isStep2LimitsConfigured && isStep3AccessibilityActive && healthState == ProtectionHealthState.PROTECTED
+        get() = isStep1AppsSelected && isStep2LimitsConfigured && isStep3AccessibilityActive
 }
 
 /**
