@@ -272,6 +272,69 @@ class MainViewModelTest {
     }
 
     @Test
+    fun loadDashboardData_populatesTopAppsDescendingMaxFiveAndFiltersZeroUsage() = runTest(testDispatcher) {
+        val discoveredApps = listOf(
+            DiscoveredApp("pkg.zero", "Zero App"),
+            DiscoveredApp("pkg.one", "One App"),
+            DiscoveredApp("pkg.two", "Two App"),
+            DiscoveredApp("pkg.three", "Three App"),
+            DiscoveredApp("pkg.four", "Four App"),
+            DiscoveredApp("pkg.five", "Five App"),
+            DiscoveredApp("pkg.six", "Six App")
+        )
+        val usageRepo = FakeFullUsageStatsRepository(
+            hasPermission = true,
+            todayUsageMap = mutableMapOf(
+                "pkg.zero" to 0L,
+                "pkg.one" to 10_000L,
+                "pkg.two" to 50_000L,
+                "pkg.three" to 20_000L,
+                "pkg.four" to 70_000L,
+                "pkg.five" to 30_000L,
+                "pkg.six" to 60_000L
+            )
+        )
+        val appDiscoveryRepo = FakeAppDiscoveryRepository(discoveredApps)
+        selectedAppsRepo.setSelectedPackages(setOf("pkg.four", "pkg.two"))
+
+        val viewModel = MainViewModel(
+            protectionHealthRepository = fakeHealthRepo,
+            selectedAppsRepository = selectedAppsRepo,
+            commitmentLockRepository = fakeCommitmentRepo,
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = appDiscoveryRepo
+        )
+        testScheduler.advanceUntilIdle()
+
+        val topApps = viewModel.uiState.value.topApps
+        // Zero usage app excluded, remaining 6 apps capped at 5
+        assertEquals(5, topApps.size)
+        // Descending order: four (70k), six (60k), two (50k), five (30k), three (20k)
+        assertEquals("pkg.four", topApps[0].packageName)
+        assertTrue(topApps[0].isMonitored)
+        assertEquals(70_000L, topApps[0].todayUsageMs)
+
+        assertEquals("pkg.six", topApps[1].packageName)
+        assertFalse(topApps[1].isMonitored)
+        assertEquals(60_000L, topApps[1].todayUsageMs)
+
+        assertEquals("pkg.two", topApps[2].packageName)
+        assertTrue(topApps[2].isMonitored)
+        assertEquals(50_000L, topApps[2].todayUsageMs)
+
+        assertEquals("pkg.five", topApps[3].packageName)
+        assertFalse(topApps[3].isMonitored)
+
+        assertEquals("pkg.three", topApps[4].packageName)
+        assertFalse(topApps[4].isMonitored)
+
+        // Toggle monitoring for pkg.six
+        viewModel.toggleAppMonitoring("pkg.six")
+        testScheduler.advanceUntilIdle()
+        assertTrue(selectedAppsRepo.isSelected("pkg.six"))
+    }
+
+    @Test
     fun mainUiState_protectionSetupPredicates_evaluateAuthoritatively() {
         // Step 1: Apps selected
         assertFalse(MainUiState(selectedAppCount = 0).isStep1AppsSelected)

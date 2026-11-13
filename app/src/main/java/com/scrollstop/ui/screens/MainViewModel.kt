@@ -2,6 +2,7 @@ package com.scrollstop.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Drawable
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,6 +24,20 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
+ * Model representing an application in the Top Apps Today dashboard breakdown.
+ */
+data class TopAppUsageItem(
+    val packageName: String,
+    val appName: String,
+    val icon: Drawable? = null,
+    val todayUsageMs: Long = 0L,
+    val isMonitored: Boolean = false
+) {
+    val formattedUsage: String
+        get() = MonitoredAppUsage.formatDuration(todayUsageMs)
+}
+
+/**
  * UI State for the Main Dashboard screen.
  */
 data class MainUiState(
@@ -35,6 +50,7 @@ data class MainUiState(
     val usageErrorMessage: String? = null,
     val sevenDayChartState: SevenDayChartState = SevenDayChartState.Loading,
     val monitoredApps: List<MonitoredAppUsage> = emptyList(),
+    val topApps: List<TopAppUsageItem> = emptyList(),
     val totalDailyLimitMs: Long? = null
 ) {
     val formattedTodayScreenTime: String
@@ -71,6 +87,7 @@ internal data class DashboardUsageData(
     val usageErrorMessage: String? = null,
     val sevenDayChartState: SevenDayChartState = SevenDayChartState.Loading,
     val monitoredApps: List<MonitoredAppUsage> = emptyList(),
+    val topApps: List<TopAppUsageItem> = emptyList(),
     val totalDailyLimitMs: Long? = null
 )
 
@@ -102,6 +119,9 @@ class MainViewModel(
                 pendingMidnightLimitMs = commitment.pendingIncreasedLimits[app.packageName]
             )
         }
+        val annotatedTopApps = usageData.topApps.map { app ->
+            app.copy(isMonitored = selectedApps.contains(app.packageName))
+        }
         MainUiState(
             healthState = health,
             selectedAppCount = selectedApps.size,
@@ -112,6 +132,7 @@ class MainViewModel(
             usageErrorMessage = usageData.usageErrorMessage,
             sevenDayChartState = usageData.sevenDayChartState,
             monitoredApps = annotatedApps,
+            topApps = annotatedTopApps,
             totalDailyLimitMs = usageData.totalDailyLimitMs
         )
     }.stateIn(
@@ -178,13 +199,20 @@ class MainViewModel(
                 }
             )
 
-            // 3. Query monitored apps
+            // 3. Query app discovery & today's usage for discovered apps & selected apps
+            val discoveredApps = appDiscoveryRepository?.getDiscoveredApps()?.getOrDefault(emptyList()) ?: emptyList()
+            val discoveredMap = discoveredApps.associateBy { it.packageName }
             val selectedPackages = selectedAppsRepository.getSelectedPackages()
-            val monitoredList = if (selectedPackages.isNotEmpty()) {
-                val discoveredApps = appDiscoveryRepository?.getDiscoveredApps()?.getOrDefault(emptyList()) ?: emptyList()
-                val discoveredMap = discoveredApps.associateBy { it.packageName }
 
-                val todayUsageMap = usageRepo.getTodayUsageForPackages(selectedPackages).getOrDefault(emptyMap())
+            val allPackagesToQuery = (discoveredApps.map { it.packageName } + selectedPackages).toSet()
+            val allTodayUsageMap = if (allPackagesToQuery.isNotEmpty()) {
+                usageRepo.getTodayUsageForPackages(allPackagesToQuery).getOrDefault(emptyMap())
+            } else {
+                emptyMap()
+            }
+
+            // 4. Query monitored apps
+            val monitoredList = if (selectedPackages.isNotEmpty()) {
                 val cumulativeUsageMap = usageRepo.getMultiDayUsageForPackages(selectedPackages, 7).getOrDefault(emptyMap())
                 val recordedDays = if (chartState is SevenDayChartState.Success) chartState.recordedDayCount else 7
                 val activeCommitment = commitmentLockRepository?.commitmentState?.value ?: CommitmentLockState()
@@ -196,9 +224,9 @@ class MainViewModel(
                         packageName = pkg,
                         appName = app?.appLabel ?: pkg,
                         icon = app?.icon,
-                        todayUsageMs = todayUsageMap[pkg] ?: 0L,
+                        todayUsageMs = allTodayUsageMap[pkg] ?: 0L,
                         dailyLimitMs = limitMs,
-                        cumulativeUsageMs = maxOf(cumulativeUsageMap[pkg] ?: 0L, todayUsageMap[pkg] ?: 0L),
+                        cumulativeUsageMs = maxOf(cumulativeUsageMap[pkg] ?: 0L, allTodayUsageMap[pkg] ?: 0L),
                         observationDays = recordedDays,
                         pendingMidnightRemoval = activeCommitment.pendingRemovedPackages.contains(pkg),
                         pendingMidnightLimitMs = activeCommitment.pendingIncreasedLimits[pkg]
@@ -207,6 +235,33 @@ class MainViewModel(
             } else {
                 emptyList()
             }
+
+            // 5. Query Top Five Apps Today (includes unmonitored apps with actual usage > 0 ms)
+            val allCatalogMap = mutableMapOf<String, Pair<String, Drawable?>>()
+            for (app in discoveredApps) {
+                allCatalogMap[app.packageName] = Pair(app.appLabel, app.icon)
+            }
+            for (pkg in selectedPackages) {
+                if (!allCatalogMap.containsKey(pkg)) {
+                    allCatalogMap[pkg] = Pair(pkg, null)
+                }
+            }
+
+            val topAppsList = allCatalogMap.entries
+                .mapNotNull { (pkg, labelAndIcon) ->
+                    val usage = allTodayUsageMap[pkg] ?: 0L
+                    if (usage > 0L) {
+                        TopAppUsageItem(
+                            packageName = pkg,
+                            appName = labelAndIcon.first,
+                            icon = labelAndIcon.second,
+                            todayUsageMs = usage,
+                            isMonitored = selectedPackages.contains(pkg)
+                        )
+                    } else null
+                }
+                .sortedByDescending { it.todayUsageMs }
+                .take(5)
 
             val totalLimit = if (monitoredList.isNotEmpty()) {
                 val limits = monitoredList.mapNotNull { it.dailyLimitMs }
@@ -220,9 +275,15 @@ class MainViewModel(
                 usageErrorMessage = null,
                 sevenDayChartState = chartState,
                 monitoredApps = monitoredList,
+                topApps = topAppsList,
                 totalDailyLimitMs = totalLimit
             )
         }
+    }
+
+    fun toggleAppMonitoring(packageName: String) {
+        selectedAppsRepository.toggleAppSelection(packageName)
+        loadDashboardData()
     }
 
     fun enableCommitmentLock(consentConfirmed: Boolean): Boolean {

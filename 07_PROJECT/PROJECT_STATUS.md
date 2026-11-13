@@ -1,13 +1,46 @@
 # Project Status
 
-**Date:** 2026-11-09\
-**Stage:** Phase 2: Home Dashboard, Guided Setup & Protection Logic Audit Complete (385 AUTOMATED TESTS PASS)
+**Date:** 2026-11-13\
+**Stage:** Phase 2: Approved Onboarding & Home Dashboard Refinement Complete
 
 ## Completed
 
 - Product concept and MVP scope defined
 - Core architecture selected (MVVM + Pragmatic Clean Architecture)
 - Documentation source of truth created and organized
+- **Stop Doom Scroll — Approved Onboarding & Home Dashboard Refinement**: PASS
+  - **1. Minimal Onboarding Flow**:
+    - `WelcomeScreen`: "Get Started" and "Continue as Guest" both direct to the Mandatory Usage Access Gate without fake authentication.
+    - `UsageAccessGateScreen`: Mandatory gating preserved. Back navigation from first-time onboarding returns to Welcome; returning revoked users cleanly minimize/finish the app.
+    - `AccessibilityConsentScreen`: Optional during onboarding. Secondary outlined "Not Now" button ($\ge 48\times 48\text{dp}$, `contentDescription = "Skip Accessibility Setup Button"`) allows users to skip Accessibility Setup and enter Home in view-only mode.
+    - Onboarding completion tracking: Skipping or granting Accessibility sets `setAccessibilityOnboardingCompleted(true)` in `OnboardingRepository` (`SharedPreferencesOnboardingRepository`), ensuring returning users with Usage Access land directly on Home without repeated onboarding prompts.
+  - **2. Refined Home Dashboard Hierarchy**:
+    1. **Compact App Header**: Single-line title ("Stop Doom Scroll"), manual Refresh action, and Settings navigation entry. Motivational subtitle removed.
+    2. **Today's Total Phone Usage Hero Card (`HeroScreenTimeCard`)**:
+       - Label updated to "Total phone usage today".
+       - Formatted total phone screen time across all apps (`formattedTodayScreenTime`).
+       - Loading ("Calculating…") and permission required ("Permission Required") states preserved.
+       - Comparison badges (e.g. "vs daily avg", "under target", "limit exceeded") and device allowances removed as approved.
+    3. **7-Day Bar Chart (`SevenDayUsageChart`)**:
+       - Reusable 7-day total phone usage chart preserved intact with honest incomplete history ("No record" dashed bars).
+    4. **Top Five Apps Today (`TopAppsTodayCard`)**:
+       - Displays top 5 apps sorted descending by today's recorded usage (`todayUsageMs > 0`).
+       - Includes unmonitored apps that have recorded screen time today.
+       - Row details: 40dp app icon, app label, formatted today's usage.
+       - Actions: "Monitored" badge for monitored apps; "+ Add" button ($\ge 48\text{dp}$ touch target) for unmonitored apps to immediately toggle monitoring.
+       - Clean empty state when no apps have recorded usage today: "No application usage recorded today".
+       - Footer "View All Apps" button navigating to the Limits tab.
+    5. **Commitment Lock Compact Card (`CommitmentStatusCard`)**:
+       - Positioned directly below Top Apps Today.
+       - Displays active/inactive state, rules explanation, and staged midnight relaxations.
+       - Displays note when Accessibility is inactive: "Note: Real-time limit enforcement and app blocking require the Accessibility Service to be enabled."
+    6. **Compact Protection Health Card (`CompactProtectionHealthCard`)**:
+       - Positioned at bottom of dashboard.
+       - Distinct states: `PROTECTED`, `ACCESSIBILITY_REQUIRED` ("Accessibility required — app blocking is inactive." with "Enable Accessibility" button), `ACCESSIBILITY_INTERRUPTED`, `DEGRADED`, and `SETUP_REQUIRED`.
+    7. **Setup Checklist Removed**:
+       - `GuidedProtectionSetupCard` checklist completely removed from Home.
+  - **3. Core Enforcement Boundary**:
+    - Zero modifications to `UsageRuleEngine`, `CommitmentRuleEngine`, `RestrictedAppAccessibilityService`, `LiveLimitEnforcementEngine`, `EnforcementRecovery`, `BlockingActivity`, or `MidnightResetReceiver`.
 - **Stop Doom Scroll — Phase 2: Protection Status Logic Audit & Corrections**: PASS
   - **Issue A: Guided Setup Accessibility Completion**: Corrected predicate `isStep3AccessibilityActive` to check `healthState == ProtectionHealthState.PROTECTED`. Eliminated false-positive checkmark when `healthState == USAGE_ACCESS_REQUIRED`, `ACCESSIBILITY_REQUIRED`, `ACCESSIBILITY_INTERRUPTED`, or `DEGRADED`.
   - **Issue B: Protection Status Accuracy**: Corrected `ProtectionStatusCard` and `MainUiState`:

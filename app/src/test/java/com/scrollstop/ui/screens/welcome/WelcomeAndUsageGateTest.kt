@@ -296,6 +296,7 @@ class WelcomeAndUsageGateTest {
             AppOpsManager.MODE_ALLOWED
         )
         onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+        onboardingRepository.setAccessibilityOnboardingCompleted(true)
 
         composeTestRule.setContent {
             StopDoomScrollTheme {
@@ -305,7 +306,6 @@ class WelcomeAndUsageGateTest {
 
         // Main dashboard must be displayed!
         composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertIsDisplayed()
     }
 
     @Test
@@ -531,6 +531,7 @@ class WelcomeAndUsageGateTest {
             AppOpsManager.MODE_IGNORED
         )
         onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+        onboardingRepository.setAccessibilityOnboardingCompleted(true)
 
         composeTestRule.setContent {
             StopDoomScrollTheme {
@@ -552,7 +553,6 @@ class WelcomeAndUsageGateTest {
 
         // Must smoothly navigate to Main dashboard
         composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertIsDisplayed()
     }
 
     @Test
@@ -564,6 +564,7 @@ class WelcomeAndUsageGateTest {
             AppOpsManager.MODE_IGNORED
         )
         onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+        onboardingRepository.setAccessibilityOnboardingCompleted(true)
 
         composeTestRule.setContent {
             StopDoomScrollTheme {
@@ -587,7 +588,6 @@ class WelcomeAndUsageGateTest {
 
         // AppNavigation ON_RESUME observer routes directly to Main
         composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertIsDisplayed()
     }
 
     @Test
@@ -599,6 +599,7 @@ class WelcomeAndUsageGateTest {
             AppOpsManager.MODE_ALLOWED
         )
         onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+        onboardingRepository.setAccessibilityOnboardingCompleted(true)
 
         composeTestRule.setContent {
             StopDoomScrollTheme {

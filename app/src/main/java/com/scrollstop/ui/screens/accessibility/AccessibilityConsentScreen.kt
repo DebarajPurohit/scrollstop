@@ -44,6 +44,7 @@ fun AccessibilityConsentScreen(
     uiState: AccessibilityConsentUiState,
     onGrantConsent: () -> Unit,
     onNavigateBack: () -> Unit,
+    onSkip: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -177,6 +178,25 @@ fun AccessibilityConsentScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                if (onSkip != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onSkip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .semantics {
+                                contentDescription = "Skip Accessibility Setup Button"
+                            }
+                    ) {
+                        Text(
+                            text = "Not Now",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
 
                 // Internal Trigger Information (if present for validation)

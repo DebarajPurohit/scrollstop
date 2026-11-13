@@ -111,6 +111,7 @@ fun MainScreen(
     onCancelUnlock: () -> Unit = {},
     onDebugResetCommitmentLock: () -> Unit = {},
     onRefresh: () -> Unit = {},
+    onAddApp: (String) -> Unit = {},
     themeRepository: ThemeRepository? = null,
     modifier: Modifier = Modifier
 ) {
@@ -220,7 +221,7 @@ fun MainScreen(
         topBar = {
             ScrollStopTopBar(
                 title = stringResource(id = R.string.app_name),
-                subtitle = stringResource(id = R.string.app_description),
+                subtitle = null,
                 actions = {
                     IconButton(
                         onClick = onRefresh,
@@ -290,47 +291,12 @@ fun MainScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // =============================================================
-                // 1. Protection Health Card (Honest Real Health Status)
-                // =============================================================
-                ProtectionStatusCard(
-                    healthState = uiState.healthState,
-                    selectedAppCount = uiState.selectedAppCount,
-                    enforcedAppCount = uiState.enforcedAppCount,
-                    onGrantUsageAccess = onGrantUsageAccess,
-                    onEnableAccessibility = onEnableAccessibility,
-                    onNavigateToAppSelection = onNavigateToAppSelection,
-                    onNavigateToLimits = onNavigateToLimits
-                )
-
-                // =============================================================
-                // 2. Commitment Lock Status Card
-                // =============================================================
-                CommitmentStatusCard(
-                    commitmentState = uiState.commitmentState,
-                    onEnableClick = { showConsentDialog = true },
-                    onRequestUnlockClick = { showUnlockDialog = true },
-                    onCancelUnlockClick = onCancelUnlock
-                )
-
-                // =============================================================
-                // 3. Guided Protection Setup (Contextual Checklist)
-                // =============================================================
-                if (!uiState.isSetupComplete) {
-                    GuidedProtectionSetupCard(
-                        uiState = uiState,
-                        onNavigateToAppSelection = onNavigateToAppSelection,
-                        onNavigateToLimits = onNavigateToLimits,
-                        onEnableAccessibility = onNavigateToAccessibilityConsent
-                    )
-                }
-
-                // =============================================================
-                // 4. Today's Screen Time Hero Metric Card
+                // 1. Today's Screen Time Hero Metric Card
                 // =============================================================
                 HeroScreenTimeCard(uiState = uiState)
 
                 // =============================================================
-                // 5. 7-Day Total Device Usage Bar Chart
+                // 2. 7-Day Total Device Usage Bar Chart
                 // =============================================================
                 SevenDayUsageChart(
                     state = uiState.sevenDayChartState,
@@ -338,35 +304,40 @@ fun MainScreen(
                 )
 
                 // =============================================================
-                // 6. Monitored Applications Breakdown List
+                // 3. Top Five Apps Today Breakdown
                 // =============================================================
-                MonitoredApplicationsCard(
+                TopAppsTodayCard(
                     uiState = uiState,
-                    onNavigateToAppSelection = onNavigateToAppSelection,
+                    onAddApp = onAddApp,
+                    onViewAll = onNavigateToLimits
+                )
+
+                // =============================================================
+                // 4. Commitment Lock Compact Card
+                // =============================================================
+                CommitmentStatusCard(
+                    commitmentState = uiState.commitmentState,
+                    healthState = uiState.healthState,
+                    onEnableClick = { showConsentDialog = true },
+                    onRequestUnlockClick = { showUnlockDialog = true },
+                    onCancelUnlockClick = onCancelUnlock
+                )
+
+                // =============================================================
+                // 5. Compact Protection Health Card
+                // =============================================================
+                CompactProtectionHealthCard(
+                    healthState = uiState.healthState,
+                    selectedAppCount = uiState.selectedAppCount,
+                    enforcedAppCount = uiState.enforcedAppCount,
+                    onGrantUsageAccess = onGrantUsageAccess,
+                    onEnableAccessibility = onEnableAccessibility,
+                    onNavigateToAccessibilityConsent = onNavigateToAccessibilityConsent,
                     onNavigateToLimits = onNavigateToLimits
                 )
 
                 // =============================================================
-                // 7. Secondary Navigation Quick Action
-                // =============================================================
-                OutlinedButton(
-                    onClick = onNavigateToAccessibilityConsent,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .semantics {
-                            contentDescription = "Accessibility Permission & Disclosure Button"
-                        }
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.btn_accessibility_disclosure),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // =============================================================
-                // 8. Developer & Debug Controls (Strictly Debug-Only)
+                // 6. Developer & Debug Controls (Strictly Debug-Only)
                 // =============================================================
                 if (com.scrollstop.BuildConfig.DEBUG) {
                     Card(
@@ -452,201 +423,9 @@ fun MainScreen(
     }
 }
 
-/**
- * Contextual Guided Protection Setup Checklist Card.
- */
-@Composable
-private fun GuidedProtectionSetupCard(
-    uiState: MainUiState,
-    onNavigateToAppSelection: () -> Unit,
-    onNavigateToLimits: () -> Unit,
-    onEnableAccessibility: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = "Guided Protection Setup Checklist" },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Protection Setup",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Complete setup to activate real-time limit enforcement.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                val completedSteps = (if (uiState.isStep1AppsSelected) 1 else 0) +
-                    (if (uiState.isStep2LimitsConfigured) 1 else 0) +
-                    (if (uiState.isStep3AccessibilityActive) 1 else 0)
-                ProtectionStatusBadge(
-                    text = "$completedSteps of 3 complete",
-                    severity = if (completedSteps == 0) BadgeSeverity.WARNING else BadgeSeverity.NEUTRAL
-                )
-            }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            // Step 1: App Selection
-            GuidedSetupStepItem(
-                stepNumber = "1",
-                title = "Choose Apps to Control",
-                description = if (uiState.isStep1AppsSelected) {
-                    "${uiState.selectedAppCount} app${if (uiState.selectedAppCount > 1) "s" else ""} selected"
-                } else {
-                    "Select distracting apps to manage"
-                },
-                isCompleted = uiState.isStep1AppsSelected,
-                actionLabel = "Choose Apps",
-                actionContentDescription = "Guided Setup Step 1 Choose Apps",
-                onAction = onNavigateToAppSelection
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            // Step 2: Daily Limits
-            GuidedSetupStepItem(
-                stepNumber = "2",
-                title = "Set Daily Limits",
-                description = if (uiState.isStep2LimitsConfigured) {
-                    "Daily allowances configured"
-                } else {
-                    "Set intentional daily allowances for each app"
-                },
-                isCompleted = uiState.isStep2LimitsConfigured,
-                actionLabel = "Set Limits",
-                actionContentDescription = "Guided Setup Step 2 Set Limits",
-                onAction = onNavigateToLimits
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
-            // Step 3: Accessibility Detection
-            GuidedSetupStepItem(
-                stepNumber = "3",
-                title = "Enable Accessibility Service",
-                description = if (uiState.isStep3AccessibilityActive) {
-                    "Detection service active"
-                } else {
-                    "Required to detect app launches and enforce limits"
-                },
-                isCompleted = uiState.isStep3AccessibilityActive,
-                actionLabel = "Enable Service",
-                actionContentDescription = "Guided Setup Step 3 Enable Service",
-                onAction = onEnableAccessibility
-            )
-        }
-    }
-}
-
-@Composable
-private fun GuidedSetupStepItem(
-    stepNumber: String,
-    title: String,
-    description: String,
-    isCompleted: Boolean,
-    actionLabel: String,
-    actionContentDescription: String,
-    onAction: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            modifier = Modifier.weight(1f),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isCompleted) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isCompleted) {
-                    Icon(
-                        imageVector = Icons.Outlined.CheckCircle,
-                        contentDescription = "Step Completed",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else {
-                    Text(
-                        text = stepNumber,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        if (!isCompleted) {
-            Button(
-                onClick = onAction,
-                modifier = Modifier
-                    .height(48.dp)
-                    .semantics { contentDescription = actionContentDescription },
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Text(
-                    text = actionLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
 
 /**
- * Today's Screen Time Hero Metric Card.
+ * Today's Total Phone Usage Hero Metric Card.
  */
 @Composable
 private fun HeroScreenTimeCard(
@@ -657,7 +436,7 @@ private fun HeroScreenTimeCard(
         modifier = modifier
             .fillMaxWidth()
             .semantics {
-                contentDescription = "Today's screen time hero metric: ${uiState.formattedTodayScreenTime}"
+                contentDescription = "Total phone usage today: ${uiState.formattedTodayScreenTime}"
             },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
@@ -676,11 +455,11 @@ private fun HeroScreenTimeCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "TODAY'S SCREEN TIME",
+                    text = "Total phone usage today",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.sp
+                    letterSpacing = 0.5.sp
                 )
 
                 when {
@@ -696,48 +475,8 @@ private fun HeroScreenTimeCard(
                             severity = BadgeSeverity.NEUTRAL
                         )
                     }
-                    uiState.totalDailyLimitMs != null -> {
-                        val remainingMs = uiState.totalDailyLimitMs - uiState.todayScreenTimeMs
-                        if (remainingMs >= 0) {
-                            ProtectionStatusBadge(
-                                text = "${MonitoredAppUsage.formatDuration(remainingMs)} under target",
-                                severity = BadgeSeverity.SUCCESS
-                            )
-                        } else {
-                            ProtectionStatusBadge(
-                                text = "Limit exceeded",
-                                severity = BadgeSeverity.ERROR
-                            )
-                        }
-                    }
-                    uiState.sevenDayChartState is SevenDayChartState.Success -> {
-                        val success = uiState.sevenDayChartState
-                        if (success.recordedDayCount > 0 && success.averageDailyTimeMs > 0) {
-                            if (uiState.todayScreenTimeMs <= success.averageDailyTimeMs) {
-                                val diff = success.averageDailyTimeMs - uiState.todayScreenTimeMs
-                                ProtectionStatusBadge(
-                                    text = "${MonitoredAppUsage.formatDuration(diff)} under daily avg",
-                                    severity = BadgeSeverity.SUCCESS
-                                )
-                            } else {
-                                val diff = uiState.todayScreenTimeMs - success.averageDailyTimeMs
-                                ProtectionStatusBadge(
-                                    text = "+${MonitoredAppUsage.formatDuration(diff)} vs daily avg",
-                                    severity = BadgeSeverity.WARNING
-                                )
-                            }
-                        } else {
-                            ProtectionStatusBadge(
-                                text = "Tracking active",
-                                severity = BadgeSeverity.SUCCESS
-                            )
-                        }
-                    }
                     else -> {
-                        ProtectionStatusBadge(
-                            text = "Tracking active",
-                            severity = BadgeSeverity.SUCCESS
-                        )
+                        // Comparison badges, limit exceeded, within limit, overall device allowance removed as approved
                     }
                 }
             }
@@ -769,17 +508,19 @@ private fun HeroScreenTimeCard(
 }
 
 /**
- * Monitored Applications breakdown section.
+ * Top five apps by today's usage card.
  */
 @Composable
-private fun MonitoredApplicationsCard(
+private fun TopAppsTodayCard(
     uiState: MainUiState,
-    onNavigateToAppSelection: () -> Unit,
-    onNavigateToLimits: () -> Unit,
+    onAddApp: (String) -> Unit,
+    onViewAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = "Top Apps Today Card" },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -797,37 +538,22 @@ private fun MonitoredApplicationsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Monitored Applications",
+                    text = "Top Apps Today",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (uiState.monitoredApps.isNotEmpty()) {
-                        TextButton(
-                            onClick = onNavigateToAppSelection,
-                            modifier = Modifier
-                                .height(48.dp)
-                                .semantics { contentDescription = "Add Monitored Apps Button" }
-                        ) {
-                            Text(
-                                text = "+ Add",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
+                if (uiState.topApps.isNotEmpty()) {
                     ProtectionStatusBadge(
-                        text = "${uiState.monitoredApps.size} Monitored",
-                        severity = if (uiState.monitoredApps.isNotEmpty()) BadgeSeverity.NEUTRAL else BadgeSeverity.WARNING
+                        text = "${uiState.topApps.size} active",
+                        severity = BadgeSeverity.NEUTRAL
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (uiState.monitoredApps.isEmpty()) {
+            if (uiState.topApps.isEmpty()) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -835,180 +561,152 @@ private fun MonitoredApplicationsCard(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "No applications monitored yet",
+                        text = "No application usage recorded today",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Select distracting apps to set daily limits and protect your screen time.",
+                        text = "Apps will appear here once used today.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Button(
-                        onClick = onNavigateToAppSelection,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .semantics {
-                                contentDescription = "Choose Apps to Control Button"
-                            }
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.btn_choose_apps),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             } else {
-                uiState.monitoredApps.forEachIndexed { index, app ->
-                    AppUsageRowItem(app = app)
-                    if (index < uiState.monitoredApps.lastIndex) {
+                uiState.topApps.forEachIndexed { index, app ->
+                    TopAppUsageRowItem(
+                        app = app,
+                        onAdd = { onAddApp(app.packageName) }
+                    )
+                    if (index < uiState.topApps.lastIndex) {
                         HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 12.dp),
+                            modifier = Modifier.padding(vertical = 10.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-                OutlinedButton(
-                    onClick = onNavigateToLimits,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .semantics {
-                            role = Role.Button
-                            contentDescription = "Configure Limits and Add Apps Button"
-                        },
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(
-                        text = "Configure Limits & Add Apps",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+            OutlinedButton(
+                onClick = onViewAll,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "View All Apps Button"
+                    },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                Text(
+                    text = "View All Apps",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
 }
 
 /**
- * Individual application usage row item adhering to UI_SPEC.md.
+ * Single application usage row in Top Apps Today list.
  */
 @Composable
-private fun AppUsageRowItem(
-    app: MonitoredAppUsage,
+private fun TopAppUsageRowItem(
+    app: TopAppUsageItem,
+    onAdd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
+    Row(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.weight(1f)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                AppIconThumbnail(
-                    drawable = app.icon,
-                    appName = app.appName,
-                    packageName = app.packageName,
-                    size = 40.dp
-                )
+            AppIconThumbnail(
+                drawable = app.icon,
+                appName = app.appName,
+                packageName = app.packageName,
+                size = 40.dp
+            )
 
-                Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-                Column {
-                    Text(
-                        text = app.appName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = app.formattedCumulative,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Column(horizontalAlignment = Alignment.End) {
+            Column {
                 Text(
-                    text = app.formattedTodayUsage,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    text = app.appName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = app.formattedLimit,
+                    text = MonitoredAppUsage.formatDuration(app.todayUsageMs),
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (app.dailyLimitMs != null && app.todayUsageMs >= app.dailyLimitMs) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    }
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        // Staged pending relaxation badges for this application
-        if (app.pendingMidnightRemoval) {
-            ProtectionStatusBadge(
-                text = "Removal at midnight",
-                severity = BadgeSeverity.WARNING
-            )
-        } else if (app.pendingMidnightLimitMs != null) {
-            ProtectionStatusBadge(
-                text = "New limit: ${app.formattedPendingMidnightLimit} at midnight",
-                severity = BadgeSeverity.WARNING
-            )
-        }
+        Spacer(modifier = Modifier.width(8.dp))
 
-        UsageProgressBar(
-            usedMs = app.todayUsageMs,
-            limitMs = app.dailyLimitMs,
-            showPercent = true,
-            height = 6.dp
-        )
+        if (app.isMonitored) {
+            ProtectionStatusBadge(
+                text = "Monitored",
+                severity = BadgeSeverity.SUCCESS
+            )
+        } else {
+            OutlinedButton(
+                onClick = onAdd,
+                modifier = Modifier
+                    .height(48.dp)
+                    .semantics {
+                        contentDescription = "Add ${app.appName} to Monitored Apps"
+                    },
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = "+ Add",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun ProtectionStatusCard(
+private fun CompactProtectionHealthCard(
     healthState: ProtectionHealthState,
     selectedAppCount: Int,
     enforcedAppCount: Int,
     onGrantUsageAccess: () -> Unit,
     onEnableAccessibility: () -> Unit,
-    onNavigateToAppSelection: () -> Unit,
-    onNavigateToLimits: () -> Unit
+    onNavigateToAccessibilityConsent: () -> Unit = onEnableAccessibility,
+    onNavigateToLimits: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val isProtected = healthState == ProtectionHealthState.PROTECTED && enforcedAppCount > 0
     val isSetupRequired = (healthState == ProtectionHealthState.PROTECTED && enforcedAppCount == 0) ||
-        healthState == ProtectionHealthState.DEGRADED
+        (healthState == ProtectionHealthState.DEGRADED && selectedAppCount == 0)
 
     val borderColor = when {
         isProtected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+        healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> MaterialTheme.extendedColors.warning
         isSetupRequired -> MaterialTheme.colorScheme.outline
         else -> MaterialTheme.colorScheme.error
     }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .semantics {
                 contentDescription = "Protection Health Card"
@@ -1017,6 +715,7 @@ private fun ProtectionStatusCard(
             containerColor = when {
                 isProtected -> MaterialTheme.colorScheme.surface
                 isSetupRequired -> MaterialTheme.colorScheme.surface
+                healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> MaterialTheme.colorScheme.surface
                 else -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
             }
         ),
@@ -1039,6 +738,14 @@ private fun ProtectionStatusCard(
                 ) {
                     when {
                         isProtected -> ProtectionStatusBadge(healthState = healthState)
+                        healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> ProtectionStatusBadge(
+                            text = "ACCESSIBILITY REQUIRED",
+                            severity = BadgeSeverity.WARNING
+                        )
+                        healthState == ProtectionHealthState.ACCESSIBILITY_INTERRUPTED -> ProtectionStatusBadge(
+                            text = "INTERRUPTED",
+                            severity = BadgeSeverity.ERROR
+                        )
                         isSetupRequired -> ProtectionStatusBadge(
                             text = "Setup Required",
                             severity = BadgeSeverity.WARNING
@@ -1048,10 +755,10 @@ private fun ProtectionStatusCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = when {
+                            healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> "Accessibility required — app blocking is inactive."
                             isProtected -> stringResource(R.string.health_status_protected)
                             isSetupRequired -> stringResource(R.string.health_status_degraded)
                             healthState == ProtectionHealthState.USAGE_ACCESS_REQUIRED -> stringResource(R.string.health_status_usage_required)
-                            healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> stringResource(R.string.health_status_accessibility_required)
                             healthState == ProtectionHealthState.ACCESSIBILITY_INTERRUPTED -> stringResource(R.string.health_status_accessibility_interrupted)
                             else -> stringResource(R.string.health_status_degraded)
                         },
@@ -1059,6 +766,7 @@ private fun ProtectionStatusCard(
                         fontWeight = FontWeight.Bold,
                         color = when {
                             isProtected -> MaterialTheme.colorScheme.onSurface
+                            healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> MaterialTheme.colorScheme.onSurface
                             isSetupRequired -> MaterialTheme.colorScheme.onSurface
                             else -> MaterialTheme.colorScheme.error
                         },
@@ -1082,6 +790,7 @@ private fun ProtectionStatusCard(
 
             Text(
                 text = when {
+                    healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> "Enable the Accessibility Service to detect app switches and enforce limits."
                     isProtected -> stringResource(R.string.health_desc_protected, enforcedAppCount)
                     isSetupRequired -> when {
                         selectedAppCount == 0 -> "Choose distracting apps to control and configure daily limits."
@@ -1089,7 +798,6 @@ private fun ProtectionStatusCard(
                         else -> stringResource(R.string.health_desc_degraded)
                     }
                     healthState == ProtectionHealthState.USAGE_ACCESS_REQUIRED -> stringResource(R.string.health_desc_usage_required)
-                    healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> stringResource(R.string.health_desc_accessibility_required)
                     healthState == ProtectionHealthState.ACCESSIBILITY_INTERRUPTED -> stringResource(R.string.health_desc_accessibility_interrupted)
                     else -> stringResource(R.string.health_desc_degraded)
                 },
@@ -1101,18 +809,34 @@ private fun ProtectionStatusCard(
             if (!isProtected) {
                 Spacer(modifier = Modifier.height(10.dp))
                 when {
-                    isSetupRequired && selectedAppCount == 0 -> {
+                    healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> {
                         Button(
-                            onClick = onNavigateToAppSelection,
+                            onClick = onNavigateToAccessibilityConsent,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp)
                                 .semantics {
-                                    contentDescription = "Choose Apps to Control Setup Button"
+                                    contentDescription = "Enable Accessibility Button"
                                 }
                         ) {
                             Text(
-                                text = stringResource(R.string.btn_choose_apps),
+                                text = "Enable Accessibility",
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    isSetupRequired && selectedAppCount == 0 -> {
+                        Button(
+                            onClick = onNavigateToLimits,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .semantics {
+                                    contentDescription = "Configure Limits Setup Button"
+                                }
+                        ) {
+                            Text(
+                                text = "Configure Limits",
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -1153,25 +877,6 @@ private fun ProtectionStatusCard(
                             )
                         }
                     }
-                    healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED -> {
-                        Button(
-                            onClick = onEnableAccessibility,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.error
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .semantics {
-                                    contentDescription = "Enable Accessibility Recovery Button"
-                                }
-                        ) {
-                            Text(
-                                text = stringResource(R.string.btn_enable_accessibility),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
                     healthState == ProtectionHealthState.ACCESSIBILITY_INTERRUPTED -> {
                         Button(
                             onClick = onEnableAccessibility,
@@ -1200,6 +905,7 @@ private fun ProtectionStatusCard(
 @Composable
 private fun CommitmentStatusCard(
     commitmentState: com.scrollstop.domain.model.CommitmentLockState,
+    healthState: ProtectionHealthState = ProtectionHealthState.PROTECTED,
     onEnableClick: () -> Unit,
     onRequestUnlockClick: () -> Unit,
     onCancelUnlockClick: () -> Unit
@@ -1251,6 +957,15 @@ private fun CommitmentStatusCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            if (healthState == ProtectionHealthState.ACCESSIBILITY_REQUIRED || healthState == ProtectionHealthState.ACCESSIBILITY_INTERRUPTED) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Note: Real-time limit enforcement and app blocking require the Accessibility Service to be enabled.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.extendedColors.warning
+                )
+            }
 
             // Staged relaxation changes section
             if (commitmentState.isRelaxationPending) {

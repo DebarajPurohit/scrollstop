@@ -22,6 +22,16 @@ class SharedPreferencesOnboardingRepository(
             .apply()
     }
 
+    override fun hasCompletedAccessibilityOnboarding(): Boolean {
+        return prefs.getBoolean(KEY_ACCESSIBILITY_ONBOARDING_COMPLETED, false)
+    }
+
+    override fun setAccessibilityOnboardingCompleted(completed: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_ACCESSIBILITY_ONBOARDING_COMPLETED, completed)
+            .apply()
+    }
+
     override fun getSessionType(): String {
         return prefs.getString(KEY_SESSION_TYPE, OnboardingRepository.SESSION_TYPE_GUEST)
             ?: OnboardingRepository.SESSION_TYPE_GUEST
@@ -34,6 +44,7 @@ class SharedPreferencesOnboardingRepository(
     companion object {
         private const val PREF_NAME = "scrollstop_onboarding_prefs"
         private const val KEY_WELCOME_COMPLETED = "key_welcome_completed"
+        private const val KEY_ACCESSIBILITY_ONBOARDING_COMPLETED = "key_accessibility_onboarding_completed"
         private const val KEY_SESSION_TYPE = "key_session_type"
     }
 }

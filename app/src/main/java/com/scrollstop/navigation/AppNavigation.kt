@@ -100,6 +100,7 @@ fun AppNavigation(
             !initialBlockedPackage.isNullOrBlank() -> Screen.Blocking(initialBlockedPackage)
             !onboardingRepository.hasCompletedWelcome() -> Screen.Welcome
             !usageStatsRepository.hasUsagePermission() -> Screen.UsageAccessGate
+            !onboardingRepository.hasCompletedAccessibilityOnboarding() -> Screen.AccessibilityConsent
             else -> Screen.Main
         }
     }
@@ -154,11 +155,21 @@ fun AppNavigation(
                 val hasPermission = usageStatsRepository.hasUsagePermission()
                 if (currentScreen is Screen.UsageAccessGate && hasPermission) {
                     gateEnteredFromWelcome = false
-                    currentScreen = Screen.Main
+                    if (!onboardingRepository.hasCompletedAccessibilityOnboarding()) {
+                        currentScreen = Screen.AccessibilityConsent
+                    } else {
+                        currentScreen = Screen.Main
+                    }
                 } else if (onboardingRepository.hasCompletedWelcome() && !hasPermission && currentScreen !is Screen.Blocking && currentScreen !is Screen.UsageAccessGate && currentScreen !is Screen.Welcome) {
                     // Usage Access was revoked while app was backgrounded: route directly to mandatory gate
                     gateEnteredFromWelcome = false
                     currentScreen = Screen.UsageAccessGate
+                } else if (currentScreen is Screen.AccessibilityConsent && !onboardingRepository.hasCompletedAccessibilityOnboarding()) {
+                    healthRepository.refreshState(context, com.scrollstop.service.RestrictedAppAccessibilityService::class.java)
+                    if (healthRepository.serviceState.value == com.scrollstop.domain.model.AccessibilityServiceState.ACCESSIBILITY_ACTIVE) {
+                        onboardingRepository.setAccessibilityOnboardingCompleted(true)
+                        currentScreen = Screen.Main
+                    }
                 }
 
                 if (currentScreen is Screen.Main) {
@@ -204,7 +215,11 @@ fun AppNavigation(
                     onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_STANDARD)
                     if (usageStatsRepository.hasUsagePermission()) {
                         gateEnteredFromWelcome = false
-                        currentScreen = Screen.Main
+                        if (!onboardingRepository.hasCompletedAccessibilityOnboarding()) {
+                            currentScreen = Screen.AccessibilityConsent
+                        } else {
+                            currentScreen = Screen.Main
+                        }
                     } else {
                         gateEnteredFromWelcome = true
                         currentScreen = Screen.UsageAccessGate
@@ -214,7 +229,11 @@ fun AppNavigation(
                     onboardingRepository.setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
                     if (usageStatsRepository.hasUsagePermission()) {
                         gateEnteredFromWelcome = false
-                        currentScreen = Screen.Main
+                        if (!onboardingRepository.hasCompletedAccessibilityOnboarding()) {
+                            currentScreen = Screen.AccessibilityConsent
+                        } else {
+                            currentScreen = Screen.Main
+                        }
                     } else {
                         gateEnteredFromWelcome = true
                         currentScreen = Screen.UsageAccessGate
@@ -244,7 +263,11 @@ fun AppNavigation(
                     val granted = usageStatsRepository.hasUsagePermission()
                     if (granted) {
                         gateEnteredFromWelcome = false
-                        currentScreen = Screen.Main
+                        if (!onboardingRepository.hasCompletedAccessibilityOnboarding()) {
+                            currentScreen = Screen.AccessibilityConsent
+                        } else {
+                            currentScreen = Screen.Main
+                        }
                     }
                     granted
                 },
@@ -259,6 +282,7 @@ fun AppNavigation(
                 onRefresh = {
                     mainViewModel.refreshDashboard(context)
                 },
+                onAddApp = mainViewModel::toggleAppMonitoring,
                 onNavigateToAppSelection = {
                     previousScreen = Screen.Main
                     currentScreen = Screen.Limits
@@ -389,8 +413,14 @@ fun AppNavigation(
             )
         }
         is Screen.AccessibilityConsent -> {
+            val isOnboarding = !onboardingRepository.hasCompletedAccessibilityOnboarding()
+
             BackHandler {
-                currentScreen = Screen.Main
+                if (isOnboarding) {
+                    currentScreen = Screen.UsageAccessGate
+                } else {
+                    currentScreen = Screen.Main
+                }
             }
 
             val viewModel = remember(healthRepository, enforcementTriggerRepository) {
@@ -408,8 +438,18 @@ fun AppNavigation(
                     viewModel.openAccessibilitySettings(context)
                 },
                 onNavigateBack = {
-                    currentScreen = Screen.Main
-                }
+                    if (isOnboarding) {
+                        currentScreen = Screen.UsageAccessGate
+                    } else {
+                        currentScreen = Screen.Main
+                    }
+                },
+                onSkip = if (isOnboarding) {
+                    {
+                        onboardingRepository.setAccessibilityOnboardingCompleted(true)
+                        currentScreen = Screen.Main
+                    }
+                } else null
             )
         }
         is Screen.Blocking -> {

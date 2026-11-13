@@ -45,13 +45,15 @@
    - **Gating Rule**: The user **must** grant Usage Access before entering Home.
    - **Explanation Provided**: Clearly explains that Stop Doom Scroll requires Usage Access strictly on-device to measure daily screen time and compute 7-day usage trends. Reassures user that data remains private and local.
    - Action: "Grant Usage Access" deep-links directly to `Settings.ACTION_USAGE_ACCESS_SETTINGS`.
-3. **Verification on Return**:
+3. **Verification on Return & Optional Accessibility Setup**:
    - On returning from Android Settings (via lifecycle `ON_RESUME`), the app immediately queries `AppOpsManager` to verify permission state.
    - An explicit "Recheck Permission" action is also provided.
-   - If granted: App smoothly transitions into the **Home Dashboard**.
+   - If granted on first-time onboarding: Transitions to the **Accessibility Setup Screen** with a secondary "Not Now" action ($\ge 48\times 48\text{dp}$).
+     - If the user chooses "Not Now", onboarding records completion (`hasCompletedAccessibilityOnboarding = true`) and transitions into the **Home Dashboard** in view-only mode.
+     - If the user enables the service, onboarding records completion and transitions to the **Home Dashboard** with active protection.
    - If NOT granted: App remains on the permission screen, displays clear guidance on how to enable the toggle in Android Settings, and refuses navigation into Home.
 4. **Returning Users**:
-   - If a returning user (Standard or Guest) already has Usage Access granted, they bypass the gate screen and land directly on the Home Dashboard.
+   - If a returning user (Standard or Guest) already has Usage Access granted, they bypass onboarding and gate screens and land directly on the Home Dashboard.
    - If a returning user previously revoked Usage Access in Android Settings, they are caught by the gate on resume and must re-grant it before accessing Home.
 5. **Back Navigation Rules at Permission Gate (Visible UI & Android System Back)**:
    - **Visible Back Arrow**: A persistent top navigation bar with an accessible 48x48dp back arrow chevron is rendered on the Usage Access Gate.
@@ -61,34 +63,34 @@
 
 ---
 
-## 2. Home Dashboard & Guided Setup Flow
+## 2. Refined Home Dashboard Hierarchy Flow
 
 ```
-[Home Dashboard Loaded (Usage Access Guaranteed Active)]
+[Home Dashboard Loaded (Usage Access Active)]
       │
-      ├───► [Query 7-Day UsageStats] ──► Render 7-Day Total Bar Chart + Today's Metric + App List
+      ├───► 1. Compact App Header (App title, Refresh, Settings / Theme)
       │
-      ├───► [Evaluate Accessibility & Protection Health]
+      ├───► 2. Today's Total Phone Usage Hero Metric (Label: "Total phone usage today")
+      │
+      ├───► 3. 7-Day Total Phone Usage Bar Chart (7 Calendar Days + Honest Incomplete Handling)
+      │
+      ├───► 4. Top Five Apps Today Breakdown (Top 5 apps with >0ms usage, 40dp icons, + Add / Monitored badge)
       │           │
-      │           ├─── Accessibility Active ───► Green Active Banner ("Enforcing limits for X apps")
-      │           │
-      │           └─── Incomplete / Setup ─────► Contextual Setup Card (App Selection -> Limits -> Accessibility)
+      │           ├─── Tap "+ Add" ───────────────► Immediate toggle to monitored app list
+      │           └─── Tap "View All Apps" ───────► Limits Tab
       │
-      └───► [User Actions]
-                  │
-                  ├───► Tap "Configure Limits & Apps" ──► Limits Screen
-                  ├───► Complete Contextual Setup     ──► Select Apps -> Set Limits -> Enable Accessibility
-                  └───► Bottom Navigation             ──► Limits / History / Settings
+      ├───► 5. Commitment Lock Compact Card (Active / Inactive, Accessibility notice, Midnight staged changes)
+      │
+      └───► 6. Compact Protection Health Card (Bottom indicator: PROTECTED, ACCESSIBILITY REQUIRED, DEGRADED, SETUP REQUIRED)
 ```
 
 - **Separation of Permissions**:
   - **Usage Access**: Mandatory prerequisite for entering Home; enables device screen time calculation, 7-day total chart rendering, and app usage breakdown.
-  - **Accessibility Service**: Separate subsequent requirement; required strictly for detecting restricted app entry and enforcing blocking, not for reading usage statistics.
-- **Guided Setup Progression (Post-Home)**:
-  1. *App Selection*: User browses installed apps and selects target apps to control.
-  2. *Daily Limits*: User configures daily time allowances per app.
-  3. *Accessibility Permission*: User reviews prominent disclosure and affirmative privacy guarantee, then grants Accessibility Service in Android Settings.
-  4. *Protection Active*: System synthesizes state to `PROTECTED`.
+  - **Accessibility Service**: Required strictly for detecting restricted app entry and enforcing blocking, not for reading usage statistics.
+- **Refined Home Architecture**:
+  - Multi-step `GuidedProtectionSetupCard` checklist is completely removed from Home.
+  - Users who skip Accessibility during onboarding enter Home in view-only mode.
+  - Compact Protection Health card at the bottom clearly indicates "Accessibility required — app blocking is inactive." with a one-tap "Enable Accessibility" button.
 
 ---
 

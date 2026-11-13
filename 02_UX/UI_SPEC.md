@@ -77,45 +77,59 @@ Entry & Gating Flow:
      - Returning / revoked user: Tapping visible back arrow or pressing Android system Back invokes `activity.finish()`, cleanly exiting/minimizing the app without trapping the user and without bypassing to Home.
      - Android 13+ Predictive Back: `android:enableOnBackInvokedCallback="true"` enabled in `AndroidManifest.xml` ensuring consistent system gesture dispatch.
 
-### 3.3 Home Dashboard Screen (First Main Screen Post-Permission)
-- **Purpose**: Central command center providing instant visibility into device screen time, monitored app consumption, and enforcement status.
+### 3.3 Home Dashboard Screen (Refined Hierarchy)
+- **Purpose**: Minimalist, data-first command center providing instant visibility into device screen time, top used apps, Commitment Lock status, and protection health.
 - **Prerequisite**: Usage Access is guaranteed active upon reaching this screen.
-- **Components**:
-  1. **Top Header**: App title ("Stop Doom Scroll"), quick Theme toggle / Profile icon leading to Settings.
-  2. **Protection Status Card**:
-     - `PROTECTED`: Green pill banner, active monitored app count, "All limits active".
-     - `ACCESSIBILITY REQUIRED`: Amber alert banner with "Enable Accessibility Service" CTA button.
-     - `ACCESSIBILITY INTERRUPTED`: Alert banner with "Re-enable Service" CTA button.
-     - `SETUP REQUIRED`: Contextual checklist guiding first-time setup (App Selection $\rightarrow$ Limits $\rightarrow$ Accessibility).
+- **Structure & Hierarchy**:
+  1. **Compact Top Header**:
+     - Single-line app title ("Stop Doom Scroll"), refresh usage action, and Settings navigation entry. Motivational subtitle removed.
+  2. **Today's Total Phone Usage Hero Card**:
+     - Label: "Total phone usage today" (neutral styling, subtle letter spacing).
+     - Hero Metric: Large, high-contrast typography showing today's total active screen time across all apps (e.g., "3h 42m").
+     - Honest loading and permission states: "Calculating…" while querying, "Permission Required" if revoked.
+     - Device allowance and comparison badges (e.g., "vs daily avg", "under target", "limit exceeded") removed for clean clarity.
   3. **Total Device Usage Chart (7 Calendar Days)**:
      - Prominent bar chart showing total phone screen time across all applications for the last 7 calendar days.
      - Clear date labels (e.g., "Mon 7", "Tue 8", ..., "Today").
      - Highlighted bar for the current day with exact hours/minutes.
      - **Incomplete History Handling**:
        - For days with recorded usage: Renders proportional solid bars with exact time.
-       - For days predating records / missing history: Renders muted dashed/stippled outline with label "No data". Never renders artificial 0-min bars.
+       - For days predating records / missing history: Renders muted dashed outline with label "No record". Never renders artificial 0-min bars.
        - Status badge: Displays "X of 7 days recorded" when history is incomplete.
-       - Baseline average: Computes daily average exclusively across days with valid records, explicitly annotated (e.g., "Avg (3 days): 2h 15m").
-  4. **Today's Total Metric**:
-     - Large, clean typography showing today's total active screen time (e.g., "3h 42m today").
-  5. **Monitored & Installed Apps Breakdown**:
-     - Ranked list showing apps by consumption.
-     - Row details: App icon, app label, today's usage (e.g., "45 min"), and cumulative usage annotated with the actual available timeframe (e.g., "4h 15m (7d)" or "1h 30m (3d of data)").
-     - Visual progress bar showing consumption relative to limit (if configured) or relative to total device time.
-     - Status badges: `Within limit`, `Nearing limit (>80%)`, `Limit reached`, or `Unrestricted`.
-     - Staged relaxation badges: Warning badges for apps scheduled for removal at midnight ("Removal at midnight") or limit increase ("New limit: X at midnight").
-     - Clean motivational empty state with direct "Choose Apps to Control" button when no apps are selected.
-  6. **Quick Configuration CTA**:
-     - Inline button: "Configure Limits & Add Apps" -> navigates directly to Limits tab.
+       - Baseline average: Computes daily average exclusively across days with valid records, explicitly annotated (e.g., "Daily avg (3 days): 2h 15m").
+  4. **Top Five Apps Today Card**:
+     - Displays up to 5 apps with recorded usage today (`todayUsageMs > 0`), sorted in descending order of screen time.
+     - Includes unmonitored apps that have recorded screen time today.
+     - Row details: 40dp app icon, app label, formatted duration of today's usage (e.g., "45m").
+     - State Action:
+       - Monitored apps display an active green "Monitored" badge.
+       - Unmonitored apps display a "+ Add" action (minimum 48dp touch target) to immediately add the app to monitored apps.
+     - Empty State: When no apps have recorded usage today, displays "No application usage recorded today" with subtext "Apps will appear here once used today."
+     - Footer Action: "View All Apps" button navigating to the Limits tab.
+  5. **Commitment Lock Compact Card**:
+     - Positioned directly below the Top Apps breakdown.
+     - Status: `COMMITMENT LOCK: ACTIVE` (primary accent border and badge) or `COMMITMENT LOCK: INACTIVE` (neutral border and badge).
+     - Subtext explains rule: "Lock your daily limits to prevent impulsive relaxation today" or "Limits and apps are locked today. Relaxations require waiting until next midnight."
+     - Explanatory note when Accessibility is inactive: "Note: Real-time limit enforcement and app blocking require the Accessibility Service to be enabled."
+     - Pending midnight relaxations surface: Lists scheduled unlocks, removals, or limit increases taking effect at next midnight (12:00 AM).
+     - Actions: "Enable Commitment Lock", "Request Unlock for Midnight", or "Cancel Unlock Request".
+  6. **Compact Protection Health Card**:
+     - Positioned at the bottom of the dashboard.
+     - States:
+       - `PROTECTED`: Green badge, "PROTECTED", "Real-time limit enforcement is active." with check icon.
+       - `ACCESSIBILITY REQUIRED`: Amber warning badge, "Accessibility required — app blocking is inactive.", with direct "Enable Accessibility" button.
+       - `ACCESSIBILITY INTERRUPTED`: Red badge, "PROTECTION INTERRUPTED", "Accessibility service was interrupted. Re-enable to resume protection.", with "Re-enable Protection" button.
+       - `SETUP REQUIRED`: Amber badge, "SETUP REQUIRED", "Choose distracting apps to control and configure daily limits.", with "Configure Limits" button.
+       - `DEGRADED`: Red badge, "USAGE ACCESS REQUIRED", with "Grant Usage Access" recovery button.
+- **Removed**:
+  - The previous multi-step `GuidedProtectionSetupCard` checklist ("Protection Setup 0 of 3 complete") is completely removed from Home. Onboarding accessibility configuration is optional during first setup.
 
-### 3.4 Guided Protection Setup (Contextual & Non-Blocking Post-Home)
-- Contextual checklist embedded on Home dashboard for completing protection:
-  1. *Step 1: App Selection* -> Choose distracting apps to control (Status badge, description, and "Choose Apps" CTA button).
-  2. *Step 2: Daily Limits* -> Set intentional daily allowances (Status badge, description, and "Set Limits" CTA button).
-  3. *Step 3: Accessibility Detection* -> Transparent disclosure and service enablement for real-time blocking (Status badge, description, and "Enable Service" CTA button).
-  4. *Step 4: Active Protection* -> Verification that limits and accessibility are active.
-- Non-blocking: Users can explore the dashboard and available historical stats immediately because Usage Access is already granted.
-- Automatically collapses/hides when all steps are completed and protection is active.
+### 3.4 Accessibility Setup (Optional Onboarding & In-App Consent)
+- **Onboarding Placement**: Follows the Mandatory Usage Access Gate during first-time onboarding.
+- **Optional / Skimmable**: Users may choose "Not Now" (secondary outlined button, $\ge 48\times 48\text{dp}$) to skip Accessibility Setup and enter the Home Dashboard immediately in view-only mode.
+- Skipping Accessibility Setup records onboarding completion (`hasCompletedAccessibilityOnboarding = true`) so the user is never repeatedly trapped or prompted on subsequent app launches.
+- When skipped, Home dashboard operates in view-only mode, with the compact Protection Health card clearly highlighting "Accessibility required — app blocking is inactive." and offering a one-tap "Enable Accessibility" action.
+- Returning users with Usage Access already granted land directly on Home, bypassing onboarding screens.
 
 ### 3.5 Limits & App Management Screen
 - **Purpose**: Search, select, and configure daily allowances for distracting applications.

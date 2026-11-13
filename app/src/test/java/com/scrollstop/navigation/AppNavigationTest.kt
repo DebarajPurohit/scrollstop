@@ -82,6 +82,7 @@ class AppNavigationTest {
         )
         val onboardingRepository = SharedPreferencesOnboardingRepository(context).apply {
             setWelcomeCompleted(true, OnboardingRepository.SESSION_TYPE_GUEST)
+            setAccessibilityOnboardingCompleted(true)
         }
 
         ServiceLocator.resetForTesting(
@@ -219,15 +220,15 @@ class AppNavigationTest {
     }
 
     @Test
-    fun homeDashboard_addAppsAction_navigatesToLimits() {
+    fun homeDashboard_viewAllAppsAction_navigatesToLimits() {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 AppNavigation()
             }
         }
 
-        // On Home, scroll down to Monitored Applications section and click Choose Apps
-        composeTestRule.onNodeWithContentDescription("Choose Apps to Control Button")
+        // On Home, scroll down to Top Apps section and click View All Apps
+        composeTestRule.onNodeWithContentDescription("View All Apps Button")
             .performScrollTo()
             .performClick()
 
@@ -237,36 +238,15 @@ class AppNavigationTest {
     }
 
     @Test
-    fun homeDashboard_configureLimitsAction_navigatesToLimits() {
-        // Pre-select an app so "Configure Limits & Add Apps" button is shown
-        selectedAppsRepository.setSelectedPackages(setOf("com.instagram.android"))
-
+    fun homeDashboard_enableAccessibilityAction_navigatesToConsent() {
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 AppNavigation()
             }
         }
 
-        // Scroll to Configure Limits & Add Apps button and click
-        composeTestRule.onNodeWithContentDescription("Configure Limits and Add Apps Button")
-            .performScrollTo()
-            .performClick()
-
-        // Verifies landing on Limits & Apps screen
-        composeTestRule.onNodeWithText("Limits & Apps").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Limits").assertIsSelected()
-    }
-
-    @Test
-    fun homeDashboard_accessibilityDisclosureAction_navigatesToConsent() {
-        composeTestRule.setContent {
-            StopDoomScrollTheme {
-                AppNavigation()
-            }
-        }
-
-        // Scroll to and click Accessibility disclosure button
-        composeTestRule.onNodeWithContentDescription("Accessibility Permission & Disclosure Button")
+        // Scroll to and click Enable Accessibility button in Protection Health Card
+        composeTestRule.onNodeWithContentDescription("Enable Accessibility Button")
             .performScrollTo()
             .performClick()
 
@@ -276,6 +256,66 @@ class AppNavigationTest {
         // Navigate back to Home
         composeTestRule.onNodeWithContentDescription("Back Button").performClick()
         composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
+    }
+
+    @Test
+    fun onboarding_freshUser_completesWelcome_grantsUsageAccess_skipsAccessibility_entersHome() {
+        // Reset onboarding state to simulate fresh installation
+        val onboardingRepo = SharedPreferencesOnboardingRepository(context).apply {
+            resetForTesting()
+        }
+        val appOpsManager = context.getSystemService(android.content.Context.APP_OPS_SERVICE) as AppOpsManager
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_IGNORED // No usage access initially
+        )
+
+        ServiceLocator.resetForTesting(
+            selectedAppsRepo = selectedAppsRepository,
+            dailyLimitRepo = dailyLimitRepository,
+            triggerRepo = enforcementTriggerRepository,
+            appDiscoveryRepo = FakeAppDiscoveryRepository(sampleDiscoveredApps),
+            onboardingRepo = onboardingRepo
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                AppNavigation()
+            }
+        }
+
+        // Step 1: Welcome Screen displayed
+        composeTestRule.onNodeWithText("STOP DOOM SCROLL").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Continue as Guest").performScrollTo().performClick()
+
+        // Step 2: Usage Access Gate displayed
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
+
+        // Grant Usage Access in system
+        Shadows.shadowOf(appOpsManager).setMode(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName,
+            AppOpsManager.MODE_ALLOWED
+        )
+
+        // Click Recheck Permission
+        composeTestRule.onNodeWithText("Recheck Permission").performScrollTo().performClick()
+
+        // Step 3: Accessibility Consent Screen displayed with "Not Now" secondary option
+        composeTestRule.onNodeWithText("Accessibility Service Prominent Disclosure").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Skip Accessibility Setup Button").performScrollTo().assertIsDisplayed()
+
+        // User skips accessibility via "Not Now"
+        composeTestRule.onNodeWithContentDescription("Skip Accessibility Setup Button").performScrollTo().performClick()
+
+        // Step 4: User enters Home in view-only mode
+        composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Home").assertIsSelected()
+        // Accessibility onboarding is recorded as completed
+        assertTrue(onboardingRepo.hasCompletedAccessibilityOnboarding())
     }
 
     @Test

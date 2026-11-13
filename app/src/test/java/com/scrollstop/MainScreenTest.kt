@@ -2,6 +2,7 @@ package com.scrollstop
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,12 +31,13 @@ class MainScreenTest {
         // Verify title exists and is displayed
         composeTestRule.onNodeWithText("Stop Doom Scroll").assertIsDisplayed()
 
-        // Verify tagline exists and is displayed
-        composeTestRule.onNodeWithText("Set your limit. When your time is up, we stop you.").assertIsDisplayed()
+        // Verify top bar actions
+        composeTestRule.onNodeWithContentDescription("Refresh Dashboard Usage").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Theme and Appearance Settings").assertIsDisplayed()
 
         // Verify commitment lock card is displayed
-        composeTestRule.onNodeWithText("COMMITMENT LOCK: INACTIVE").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Enable Commitment Lock").assertIsDisplayed()
+        composeTestRule.onNodeWithText("COMMITMENT LOCK: INACTIVE").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enable Commitment Lock").performScrollTo().assertIsDisplayed()
 
         // Verify development build status card title exists and is displayed after scroll
         composeTestRule.onNodeWithText("Development Build").performScrollTo().assertIsDisplayed()

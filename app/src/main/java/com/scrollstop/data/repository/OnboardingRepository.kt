@@ -6,6 +6,8 @@ package com.scrollstop.data.repository
 interface OnboardingRepository {
     fun hasCompletedWelcome(): Boolean
     fun setWelcomeCompleted(completed: Boolean, sessionType: String = SESSION_TYPE_GUEST)
+    fun hasCompletedAccessibilityOnboarding(): Boolean = false
+    fun setAccessibilityOnboardingCompleted(completed: Boolean) {}
     fun getSessionType(): String
     fun resetForTesting()
 

@@ -51,8 +51,8 @@ class MainScreenHealthUiTest {
             }
         }
 
-        composeTestRule.onNodeWithText("PROTECTION ACTIVE").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Enforcing daily limits for 3 selected apps.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("PROTECTION ACTIVE").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enforcing daily limits for 3 selected apps.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -101,10 +101,10 @@ class MainScreenHealthUiTest {
         // Must NOT show PROTECTION ACTIVE
         composeTestRule.onNode(hasText("PROTECTION ACTIVE")).assertDoesNotExist()
         // Must show SETUP REQUIRED
-        composeTestRule.onNodeWithText("SETUP REQUIRED").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Configure daily limits for your selected apps to enable protection.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("SETUP REQUIRED").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Configure daily limits for your selected apps to enable protection.").performScrollTo().assertIsDisplayed()
         // Must show Configure Limits CTA and trigger navigation
-        composeTestRule.onNodeWithContentDescription("Configure Limits Setup Button").performClick()
+        composeTestRule.onNodeWithContentDescription("Configure Limits Setup Button").performScrollTo().performClick()
         assertTrue(configureLimitsClicked)
     }
 
@@ -129,8 +129,8 @@ class MainScreenHealthUiTest {
         }
 
         // Selected app count is 3, but enforced count is 1. Banner must reflect enforced app count (1)
-        composeTestRule.onNodeWithText("PROTECTION ACTIVE").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Enforcing daily limits for 1 selected apps.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("PROTECTION ACTIVE").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Enforcing daily limits for 1 selected apps.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -148,9 +148,9 @@ class MainScreenHealthUiTest {
             }
         }
 
-        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Grant Usage Access Recovery Button").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Grant Usage Access Recovery Button").performClick()
+        composeTestRule.onNodeWithText("USAGE ACCESS REQUIRED").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Grant Usage Access Recovery Button").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Grant Usage Access Recovery Button").performScrollTo().performClick()
         assertTrue(clicked)
     }
 
@@ -169,9 +169,9 @@ class MainScreenHealthUiTest {
             }
         }
 
-        composeTestRule.onNodeWithText("PROTECTION INTERRUPTED").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Re-enable Protection Recovery Button").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Re-enable Protection Recovery Button").performClick()
+        composeTestRule.onNodeWithText("PROTECTION INTERRUPTED").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Re-enable Protection Recovery Button").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Re-enable Protection Recovery Button").performScrollTo().performClick()
         assertTrue(clicked)
     }
 
@@ -182,14 +182,12 @@ class MainScreenHealthUiTest {
             DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 3_600_000L, hasRecord = true),
             DailyUsageRecord("Today", "Tue", 2L, totalScreenTimeMs = 13_320_000L, hasRecord = true, isCurrentDay = true)
         )
-        val monitoredApps = listOf(
-            MonitoredAppUsage(
+        val topApps = listOf(
+            TopAppUsageItem(
                 packageName = "com.instagram.android",
                 appName = "Instagram",
                 todayUsageMs = 2_700_000L, // 45m
-                dailyLimitMs = 1_800_000L, // 30m
-                cumulativeUsageMs = 12_000_000L,
-                observationDays = 2
+                isMonitored = true
             )
         )
 
@@ -203,8 +201,7 @@ class MainScreenHealthUiTest {
                         isUsageLoading = false,
                         todayScreenTimeMs = 13_320_000L,
                         sevenDayChartState = SevenDayChartState.Success(days = records),
-                        monitoredApps = monitoredApps,
-                        totalDailyLimitMs = 1_800_000L
+                        topApps = topApps
                     ),
                     onNavigateToLimits = { limitsClicked = true }
                 )
@@ -212,24 +209,22 @@ class MainScreenHealthUiTest {
         }
 
         // Verify Hero Metric card
-        composeTestRule.onNodeWithText("TODAY'S SCREEN TIME").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Today's screen time hero metric: 3h 42m").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Total phone usage today").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Total phone usage today: 3h 42m").performScrollTo().assertIsDisplayed()
 
         // Verify 7-Day chart renders
         composeTestRule.onNodeWithText("7-Day Screen Time").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Mon").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("Today: 3h 42m").performScrollTo().assertIsDisplayed()
 
-        // Verify Monitored Apps list
-        composeTestRule.onNodeWithText("Monitored Applications").performScrollTo().assertIsDisplayed()
+        // Verify Top Apps Today list
+        composeTestRule.onNodeWithText("Top Apps Today").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("Instagram").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("45m").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("3h 20m (2d of data)").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Monitored").performScrollTo().assertIsDisplayed()
 
-        // Verify configure limits button
-        composeTestRule.onNodeWithText("Configure Limits & Add Apps").performScrollTo().performClick()
+        // Verify view all apps button
+        composeTestRule.onNodeWithText("View All Apps").performScrollTo().performClick()
         assertTrue(limitsClicked)
     }
 
@@ -282,16 +277,14 @@ class MainScreenHealthUiTest {
     }
 
     @Test
-    fun mainScreen_addMonitoredAppsButtonNavigatesToAppSelection() {
-        var addAppsClicked = false
-        val monitoredApps = listOf(
-            MonitoredAppUsage(
+    fun mainScreen_topAppsToday_unmonitoredApp_clickingAddInvokesCallback() {
+        var addedPackage: String? = null
+        val topApps = listOf(
+            TopAppUsageItem(
                 packageName = "com.facebook.katana",
                 appName = "Facebook",
                 todayUsageMs = 120_000L,
-                dailyLimitMs = 120_000L,
-                cumulativeUsageMs = 120_000L,
-                observationDays = 1
+                isMonitored = false
             )
         )
 
@@ -300,61 +293,40 @@ class MainScreenHealthUiTest {
                 MainScreen(
                     uiState = MainUiState(
                         healthState = ProtectionHealthState.PROTECTED,
-                        monitoredApps = monitoredApps
+                        topApps = topApps
                     ),
-                    onNavigateToAppSelection = { addAppsClicked = true }
+                    onAddApp = { addedPackage = it }
                 )
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Add Monitored Apps Button").performScrollTo().performClick()
-        assertTrue(addAppsClicked)
+        composeTestRule.onNodeWithContentDescription("Add Facebook to Monitored Apps").performScrollTo().performClick()
+        assertEquals("com.facebook.katana", addedPackage)
     }
 
     @Test
-    fun mainScreen_monitoredAppExceededLimit_rendersCommitmentMessageInDarkTheme() {
-        val monitoredApps = listOf(
-            MonitoredAppUsage(
-                packageName = "com.instagram.android",
-                appName = "Instagram",
-                todayUsageMs = 2_700_000L, // 45m
-                dailyLimitMs = 1_800_000L, // 30m limit (exceeded)
-                cumulativeUsageMs = 12_000_000L,
-                observationDays = 2
-            )
-        )
-
+    fun mainScreen_topAppsToday_emptyState_rendersEmptyMessage() {
         composeTestRule.setContent {
-            StopDoomScrollTheme(themeMode = ThemeMode.DARK) {
+            StopDoomScrollTheme {
                 MainScreen(
                     uiState = MainUiState(
                         healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 1,
-                        monitoredApps = monitoredApps
+                        topApps = emptyList()
                     )
                 )
             }
         }
 
-        // Verify actual usage and configured limit remain visible
-        composeTestRule.onNodeWithText("Instagram").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("45m").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
-        // Verify commitment message is displayed
-        composeTestRule.onNodeWithText("Respect the commitment you made to yourself.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("No application usage recorded today").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Apps will appear here once used today.").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun mainScreen_monitoredAppUnderLimit_retainsExistingBehavior() {
-        val monitoredApps = listOf(
-            MonitoredAppUsage(
-                packageName = "com.google.android.youtube",
-                appName = "YouTube",
-                todayUsageMs = 900_000L, // 15m
-                dailyLimitMs = 1_800_000L, // 30m limit (50% under limit)
-                cumulativeUsageMs = 5_000_000L,
-                observationDays = 2
-            )
+    fun mainScreen_topAppsToday_rendersTopFiveAppsAndMonitoredBadge() {
+        val topApps = listOf(
+            TopAppUsageItem(packageName = "com.app.one", appName = "App One", todayUsageMs = 3_600_000L, isMonitored = true),
+            TopAppUsageItem(packageName = "com.app.two", appName = "App Two", todayUsageMs = 1_800_000L, isMonitored = false),
+            TopAppUsageItem(packageName = "com.app.three", appName = "App Three", todayUsageMs = 900_000L, isMonitored = true)
         )
 
         composeTestRule.setContent {
@@ -362,176 +334,61 @@ class MainScreenHealthUiTest {
                 MainScreen(
                     uiState = MainUiState(
                         healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 1,
-                        monitoredApps = monitoredApps
+                        topApps = topApps
                     )
                 )
             }
         }
 
-        // Verify actual usage and configured limit remain visible
-        composeTestRule.onNodeWithText("YouTube").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Top Apps Today").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("App One").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("1h 0m").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("App Two").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("30m").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("App Three").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithText("15m").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("30m daily").performScrollTo().assertIsDisplayed()
-        // Verify under-limit percentage is displayed
-        composeTestRule.onNodeWithText("50%").performScrollTo().assertIsDisplayed()
     }
 
     @Test
-    fun mainScreen_guidedSetup_incompleteState_rendersChecklistAndNavigates() {
-        var chooseAppsClicked = false
+    fun mainScreen_accessibilityRequired_rendersInactiveWarningAndEnableButton() {
+        var enableAccessibilityClicked = false
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 MainScreen(
                     uiState = MainUiState(
                         healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED,
-                        selectedAppCount = 0
+                        selectedAppCount = 1
                     ),
-                    onNavigateToAppSelection = { chooseAppsClicked = true }
+                    onNavigateToAccessibilityConsent = { enableAccessibilityClicked = true }
                 )
             }
         }
 
-        // Verify guided setup card is visible
-        composeTestRule.onNodeWithText("Protection Setup").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("0 of 3 complete").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Guided Setup Step 1 Choose Apps").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Set Daily Limits").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Enable Accessibility Service").performScrollTo().assertIsDisplayed()
-
-        // Click choose apps action
-        composeTestRule.onNodeWithContentDescription("Guided Setup Step 1 Choose Apps").performScrollTo().performClick()
-        assertTrue(chooseAppsClicked)
+        composeTestRule.onNodeWithText("ACCESSIBILITY REQUIRED").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Accessibility required — app blocking is inactive.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Enable Accessibility Button").performScrollTo().performClick()
+        assertTrue(enableAccessibilityClicked)
     }
 
     @Test
-    fun mainScreen_guidedSetup_step1Completed_showsProgress() {
+    fun mainScreen_protectionStatusCard_zeroSelectedApps_showsSetupRequired() {
         var configureLimitsClicked = false
         composeTestRule.setContent {
             StopDoomScrollTheme {
                 MainScreen(
                     uiState = MainUiState(
-                        healthState = ProtectionHealthState.ACCESSIBILITY_REQUIRED,
-                        selectedAppCount = 2,
-                        monitoredApps = listOf(
-                            MonitoredAppUsage(packageName = "com.app.one", appName = "App 1", dailyLimitMs = null),
-                            MonitoredAppUsage(packageName = "com.app.two", appName = "App 2", dailyLimitMs = null)
-                        )
+                        healthState = ProtectionHealthState.PROTECTED,
+                        selectedAppCount = 0
                     ),
                     onNavigateToLimits = { configureLimitsClicked = true }
                 )
             }
         }
 
-        // Step 1 completed, 1 of 3
-        composeTestRule.onNodeWithText("Protection Setup").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("1 of 3 complete").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("2 apps selected").performScrollTo().assertIsDisplayed()
-
-        // Step 2 pending: Set Limits
-        composeTestRule.onNodeWithContentDescription("Guided Setup Step 2 Set Limits").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("SETUP REQUIRED").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Choose distracting apps to control and configure daily limits.").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Configure Limits Setup Button").performScrollTo().performClick()
         assertTrue(configureLimitsClicked)
-    }
-
-    @Test
-    fun mainScreen_guidedSetup_completedState_hidesChecklist() {
-        val monitoredApps = listOf(
-            MonitoredAppUsage(
-                packageName = "com.instagram.android",
-                appName = "Instagram",
-                dailyLimitMs = 1_800_000L
-            )
-        )
-
-        composeTestRule.setContent {
-            StopDoomScrollTheme {
-                MainScreen(
-                    uiState = MainUiState(
-                        healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 1,
-                        monitoredApps = monitoredApps
-                    )
-                )
-            }
-        }
-
-        // Checklist should be hidden when protection is fully configured
-        composeTestRule.onNode(hasText("Protection Setup")).assertDoesNotExist()
-        composeTestRule.onNodeWithText("PROTECTION ACTIVE").assertIsDisplayed()
-    }
-
-    @Test
-    fun mainScreen_protectionStatusCard_zeroSelectedApps_showsSetupRequired() {
-        var chooseAppsClicked = false
-        composeTestRule.setContent {
-            StopDoomScrollTheme {
-                MainScreen(
-                    uiState = MainUiState(
-                        healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 0
-                    ),
-                    onNavigateToAppSelection = { chooseAppsClicked = true }
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("SETUP REQUIRED").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Choose distracting apps to control and configure daily limits.").assertIsDisplayed()
-        composeTestRule.onNodeWithContentDescription("Choose Apps to Control Setup Button").performClick()
-        assertTrue(chooseAppsClicked)
-    }
-
-    @Test
-    fun mainScreen_monitoredApps_emptyState_rendersMotivationalEmptyState() {
-        composeTestRule.setContent {
-            StopDoomScrollTheme {
-                MainScreen(
-                    uiState = MainUiState(
-                        healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 0,
-                        monitoredApps = emptyList()
-                    )
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("No applications monitored yet").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("Select distracting apps to set daily limits and protect your screen time.").performScrollTo().assertIsDisplayed()
-    }
-
-    @Test
-    fun mainScreen_monitoredApps_withPendingMidnightChanges_rendersBadges() {
-        val monitoredApps = listOf(
-            MonitoredAppUsage(
-                packageName = "com.test.remove",
-                appName = "RemovableApp",
-                todayUsageMs = 600_000L,
-                dailyLimitMs = 1_800_000L,
-                pendingMidnightRemoval = true
-            ),
-            MonitoredAppUsage(
-                packageName = "com.test.increase",
-                appName = "IncreasedApp",
-                todayUsageMs = 1_200_000L,
-                dailyLimitMs = 1_800_000L,
-                pendingMidnightLimitMs = 3_600_000L
-            )
-        )
-
-        composeTestRule.setContent {
-            StopDoomScrollTheme {
-                MainScreen(
-                    uiState = MainUiState(
-                        healthState = ProtectionHealthState.PROTECTED,
-                        selectedAppCount = 2,
-                        monitoredApps = monitoredApps
-                    )
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithText("Removal at midnight").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithText("New limit: 1h 0m daily at midnight").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -563,7 +420,7 @@ class MainScreenHealthUiTest {
     }
 
     @Test
-    fun mainScreen_heroMetric_showsComparisonAgainstSevenDayAverage() {
+    fun mainScreen_heroMetric_rendersWithoutComparisonBadges() {
         val records = listOf(
             DailyUsageRecord("Mon 8", "Mon", 1L, totalScreenTimeMs = 7_200_000L, hasRecord = true), // 2h
             DailyUsageRecord("Today", "Tue", 2L, totalScreenTimeMs = 3_600_000L, hasRecord = true, isCurrentDay = true) // 1h
@@ -583,8 +440,10 @@ class MainScreenHealthUiTest {
             }
         }
 
-        // Average is (2h + 1h) / 2 = 1h 30m. Today is 1h 0m -> diff = 30m under daily avg
-        composeTestRule.onNodeWithText("30m under daily avg").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Total phone usage today").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Total phone usage today: 1h 0m").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasText("30m under daily avg")).assertDoesNotExist()
+        composeTestRule.onNode(hasText("Tracking active")).assertDoesNotExist()
     }
 
     private class FakeThemeRepo(initialMode: ThemeMode = ThemeMode.SYSTEM) : ThemeRepository {
