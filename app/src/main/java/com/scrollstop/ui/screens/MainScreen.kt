@@ -623,6 +623,12 @@ private fun TopAppUsageRowItem(
     onAdd: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val displayAppName = if (app.appName.isNotBlank() && app.appName != app.packageName) {
+        app.appName
+    } else {
+        "Unknown app"
+    }
+
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -634,7 +640,7 @@ private fun TopAppUsageRowItem(
         ) {
             AppIconThumbnail(
                 drawable = app.icon,
-                appName = app.appName,
+                appName = displayAppName,
                 packageName = app.packageName,
                 size = 40.dp
             )
@@ -643,7 +649,7 @@ private fun TopAppUsageRowItem(
 
             Column {
                 Text(
-                    text = app.appName,
+                    text = displayAppName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -669,7 +675,7 @@ private fun TopAppUsageRowItem(
                 modifier = Modifier
                     .height(48.dp)
                     .semantics {
-                        contentDescription = "Add ${app.appName} to Monitored Apps"
+                        contentDescription = "Add $displayAppName to Monitored Apps"
                     },
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -694,9 +700,8 @@ private fun CompactProtectionHealthCard(
     onNavigateToLimits: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isProtected = healthState == ProtectionHealthState.PROTECTED && enforcedAppCount > 0
-    val isSetupRequired = (healthState == ProtectionHealthState.PROTECTED && enforcedAppCount == 0) ||
-        (healthState == ProtectionHealthState.DEGRADED && selectedAppCount == 0)
+    val isProtected = healthState == ProtectionHealthState.PROTECTED && selectedAppCount > 0 && enforcedAppCount > 0
+    val isSetupRequired = healthState == ProtectionHealthState.PROTECTED && (selectedAppCount == 0 || enforcedAppCount == 0)
 
     val borderColor = when {
         isProtected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)

@@ -239,11 +239,16 @@ class MainViewModel(
             // 5. Query Top Five Apps Today (includes unmonitored apps with actual usage > 0 ms)
             val allCatalogMap = mutableMapOf<String, Pair<String, Drawable?>>()
             for (app in discoveredApps) {
-                allCatalogMap[app.packageName] = Pair(app.appLabel, app.icon)
+                val resolvedLabel = if (app.appLabel.isNotBlank() && app.appLabel != app.packageName) {
+                    app.appLabel
+                } else {
+                    "Unknown app"
+                }
+                allCatalogMap[app.packageName] = Pair(resolvedLabel, app.icon)
             }
             for (pkg in selectedPackages) {
                 if (!allCatalogMap.containsKey(pkg)) {
-                    allCatalogMap[pkg] = Pair(pkg, null)
+                    allCatalogMap[pkg] = Pair("Unknown app", null)
                 }
             }
 

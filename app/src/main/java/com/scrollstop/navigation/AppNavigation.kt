@@ -164,7 +164,7 @@ fun AppNavigation(
                     // Usage Access was revoked while app was backgrounded: route directly to mandatory gate
                     gateEnteredFromWelcome = false
                     currentScreen = Screen.UsageAccessGate
-                } else if (currentScreen is Screen.AccessibilityConsent && !onboardingRepository.hasCompletedAccessibilityOnboarding()) {
+                } else if (currentScreen is Screen.AccessibilityConsent) {
                     healthRepository.refreshState(context, com.scrollstop.service.RestrictedAppAccessibilityService::class.java)
                     if (healthRepository.serviceState.value == com.scrollstop.domain.model.AccessibilityServiceState.ACCESSIBILITY_ACTIVE) {
                         onboardingRepository.setAccessibilityOnboardingCompleted(true)

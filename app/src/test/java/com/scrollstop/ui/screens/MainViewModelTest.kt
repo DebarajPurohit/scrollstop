@@ -335,6 +335,39 @@ class MainViewModelTest {
     }
 
     @Test
+    fun loadDashboardData_unresolvableAppLabels_fallBackToUnknownApp() = runTest(testDispatcher) {
+        val discoveredApps = listOf(
+            DiscoveredApp("pkg.blank", "   "),
+            DiscoveredApp("pkg.matches", "pkg.matches")
+        )
+        val usageRepo = FakeFullUsageStatsRepository(
+            hasPermission = true,
+            todayUsageMap = mutableMapOf(
+                "pkg.blank" to 10_000L,
+                "pkg.matches" to 20_000L,
+                "pkg.uninstalled" to 30_000L
+            )
+        )
+        val appDiscoveryRepo = FakeAppDiscoveryRepository(discoveredApps)
+        selectedAppsRepo.setSelectedPackages(setOf("pkg.uninstalled"))
+
+        val viewModel = MainViewModel(
+            protectionHealthRepository = fakeHealthRepo,
+            selectedAppsRepository = selectedAppsRepo,
+            commitmentLockRepository = fakeCommitmentRepo,
+            usageStatsRepository = usageRepo,
+            appDiscoveryRepository = appDiscoveryRepo
+        )
+        testScheduler.advanceUntilIdle()
+
+        val topApps = viewModel.uiState.value.topApps
+        assertEquals(3, topApps.size)
+        assertEquals("Unknown app", topApps[0].appName) // pkg.uninstalled (30k)
+        assertEquals("Unknown app", topApps[1].appName) // pkg.matches (20k)
+        assertEquals("Unknown app", topApps[2].appName) // pkg.blank (10k)
+    }
+
+    @Test
     fun mainUiState_protectionSetupPredicates_evaluateAuthoritatively() {
         // Step 1: Apps selected
         assertFalse(MainUiState(selectedAppCount = 0).isStep1AppsSelected)

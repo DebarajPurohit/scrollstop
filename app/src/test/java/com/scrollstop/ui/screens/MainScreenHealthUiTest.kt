@@ -446,6 +446,39 @@ class MainScreenHealthUiTest {
         composeTestRule.onNode(hasText("Tracking active")).assertDoesNotExist()
     }
 
+    @Test
+    fun mainScreen_topApps_unresolvableLabel_rendersUnknownApp() {
+        var addClicked = false
+        val topApps = listOf(
+            TopAppUsageItem(
+                packageName = "com.unresolved.app",
+                appName = "com.unresolved.app",
+                todayUsageMs = 60_000L,
+                isMonitored = false
+            )
+        )
+
+        composeTestRule.setContent {
+            StopDoomScrollTheme {
+                MainScreen(
+                    uiState = MainUiState(
+                        healthState = ProtectionHealthState.PROTECTED,
+                        topApps = topApps
+                    ),
+                    onAddApp = { addClicked = true }
+                )
+            }
+        }
+
+        // Package name must NOT be displayed as the app label
+        composeTestRule.onNodeWithText("com.unresolved.app").assertDoesNotExist()
+        // "Unknown app" must be displayed
+        composeTestRule.onNodeWithText("Unknown app").performScrollTo().assertIsDisplayed()
+        // "+ Add" button semantics use "Unknown app"
+        composeTestRule.onNodeWithContentDescription("Add Unknown app to Monitored Apps").performScrollTo().performClick()
+        assertTrue(addClicked)
+    }
+
     private class FakeThemeRepo(initialMode: ThemeMode = ThemeMode.SYSTEM) : ThemeRepository {
         private val _flow = MutableStateFlow(initialMode)
         override val themeModeFlow: StateFlow<ThemeMode> = _flow
